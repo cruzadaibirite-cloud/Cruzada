@@ -3,7 +3,10 @@
     "allow": [
       "Bash(firebase deploy *)",
       "Bash(node *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(npm create *)",
+      "Bash(npm init *)",
+      "Bash(npm install *)"
     ]
   }
 }
