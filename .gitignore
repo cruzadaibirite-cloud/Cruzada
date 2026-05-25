@@ -1,0 +1,28 @@
+# Variáveis de ambiente (NUNCA commitar)
+.env
+.env.local
+.env.production
+**/.env
+**/.env.local
+
+# Dependências
+node_modules/
+**/node_modules/
+
+# Build
+dist/
+build/
+
+# Claude
+.claude/settings.local.json
+
+# Imagens locais (ficam só na máquina)
+imagens/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
