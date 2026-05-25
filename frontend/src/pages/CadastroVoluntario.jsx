@@ -152,11 +152,10 @@ export default function CadastroVoluntario() {
       {showInstaModal && (
         <div style={s.modalOverlay}>
           <div style={s.modalBox}>
-            <div style={s.modalIcon}>📷</div>
             <h3 style={s.modalTitle}>Atenção ao Instagram</h3>
             <p style={s.modalText}>Seu Instagram precisa estar <strong>público</strong> no momento do cadastro.</p>
             <button style={s.btnPrimary} onClick={() => { instaConfirmed.current = true; setShowInstaModal(false) }}>
-              Entendi, meu perfil está público
+              Entendi
             </button>
           </div>
         </div>
