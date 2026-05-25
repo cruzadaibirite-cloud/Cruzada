@@ -183,7 +183,7 @@ export default function Login() {
                 <div style={s.orLine}/><span style={s.orText}>não tem acesso?</span><div style={s.orLine}/>
               </div>
 
-              <a href="/voluntario" style={s.btnOutline}>Quero ser voluntário</a>
+              <a href="/voluntario" style={s.btnOutline}>Quero fazer parte</a>
 
               <a href="/" style={s.backLink} className="login-back-link">← Voltar ao site</a>
             </>

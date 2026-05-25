@@ -399,9 +399,10 @@ export default function Home() {
           .hero-left { text-align: center; width: 100%; }
           .hero-sub { max-width: 100%; font-size: 14px; }
           .hero-badge { justify-content: center; }
-          .hero-cd { justify-content: center; flex-wrap: wrap; gap: 8px; }
-          .hcd { min-width: 60px; padding: 10px 12px; }
-          .hcd-num { font-size: 22px; }
+          .hero-cd { justify-content: center; flex-wrap: nowrap; gap: 6px; width: 100%; }
+          .hcd { min-width: 0; flex: 1; padding: 10px 8px; }
+          .hcd-num { font-size: 20px; }
+          .hcd-label { font-size: 7px; }
           .hero-btns { justify-content: center; flex-wrap: wrap; }
           .sec-h2-line { margin-left: auto; margin-right: auto; }
           section { padding-left: 24px !important; padding-right: 24px !important; }
