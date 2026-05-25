@@ -124,7 +124,7 @@ export default function Home() {
         .btn-nav { background: var(--orange); color: #fff; padding: 11px 28px; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; text-decoration: none; transition: all .2s; white-space: nowrap; border-radius: 50px; cursor: pointer; border: none; font-family: inherit; }
         .btn-nav:hover { background: var(--orange2); box-shadow: 0 0 24px rgba(249,115,22,.5); }
         .hero { background: var(--dark); min-height: 100dvh; position: relative; overflow: hidden; display: flex; align-items: center; }
-        .hero-map { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 30% 50%, rgba(249,115,22,.06) 0%, transparent 60%), url('https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1920&q=60') center/cover no-repeat; filter: brightness(.12) saturate(.2); }
+        .hero-map { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 30% 50%, rgba(249,115,22,.06) 0%, transparent 60%), url('/f1.jpg') center/cover no-repeat; filter: brightness(.12) saturate(.2); }
         .hero-inner { position: relative; z-index: 2; width: 100%; max-width: 1280px; margin: 0 auto; padding: 80px 72px; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 60px; }
         .hero-badge { display: inline-flex; align-items: center; gap: 10px; font-size: 10px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; color: var(--orange); margin-bottom: 24px; }
         .hero-badge::after { content: '›› ›› ›'; color: rgba(249,115,22,.4); letter-spacing: 2px; }
@@ -440,7 +440,7 @@ export default function Home() {
 
       <nav>
         <a href="#" className="nav-logo">
-          <div className="nav-logo-mark">C</div>
+          <img src="/logo1.png" alt="Logo" style={{height:'38px', width:'auto'}} />
           <span className="nav-logo-text">Cruzada <span>Ibirité</span></span>
         </a>
         <ul className="nav-links">
@@ -485,7 +485,7 @@ export default function Home() {
             <div className="hero-circle-wrap">
               <div className="hero-circle-bg"></div>
               <div className="hero-circle-img">
-                <img src="https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?w=800&q=80" alt="Ibirité" />
+                <img src="/f2.jpeg" alt="Ibirité" />
               </div>
               <div className="hero-img-badge">9 Dias de Missão</div>
             </div>
@@ -515,9 +515,9 @@ export default function Home() {
           </div>
         </div>
         <div className="setores-cards r2">
-          <div className="sc-card"><div className="sc-card-img"><img src="https://images.unsplash.com/photo-1529390079861-591de354faf5?w=600&q=70" alt="Casa em Casa" /><div className="sc-card-img-overlay"></div><div className="sc-badge">01</div></div><div className="sc-card-body"><div className="sc-card-title">Casa em Casa</div><div className="sc-card-desc">Duplas treinadas percorrem cada rua orando pelas famílias e compartilhando o Evangelho diretamente nos lares.</div></div></div>
-          <div className="sc-card"><div className="sc-card-img"><img src="https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=600&q=70" alt="Praças e Ruas" /><div className="sc-card-img-overlay"></div><div className="sc-badge">02</div></div><div className="sc-card-body"><div className="sc-card-title">Praças & Ruas</div><div className="sc-card-desc">Louvor ao ar livre, pregação direta e oração por pessoas nas principais praças e espaços públicos de Ibirité.</div></div></div>
-          <div className="sc-card"><div className="sc-card-img"><img src="https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=600&q=70" alt="Ação Social" /><div className="sc-card-img-overlay"></div><div className="sc-badge">03</div></div><div className="sc-card-body"><div className="sc-card-title">Ação Social</div><div className="sc-card-desc">O Evangelho na prática — visitas a lares de idosos, abrigos, hospitais e casas de recuperação com cuidado real.</div></div></div>
+          <div className="sc-card"><div className="sc-card-img"><img src="/oqf1.jpeg" alt="Casa em Casa" /><div className="sc-card-img-overlay"></div><div className="sc-badge">01</div></div><div className="sc-card-body"><div className="sc-card-title">Casa em Casa</div><div className="sc-card-desc">Duplas treinadas percorrem cada rua orando pelas famílias e compartilhando o Evangelho diretamente nos lares.</div></div></div>
+          <div className="sc-card"><div className="sc-card-img"><img src="/oqf2.jpeg" alt="Praças e Ruas" /><div className="sc-card-img-overlay"></div><div className="sc-badge">02</div></div><div className="sc-card-body"><div className="sc-card-title">Praças & Ruas</div><div className="sc-card-desc">Louvor ao ar livre, pregação direta e oração por pessoas nas principais praças e espaços públicos de Ibirité.</div></div></div>
+          <div className="sc-card"><div className="sc-card-img"><img src="/oqf3.jpeg" alt="Ação Social" /><div className="sc-card-img-overlay"></div><div className="sc-badge">03</div></div><div className="sc-card-body"><div className="sc-card-title">Ação Social</div><div className="sc-card-desc">O Evangelho na prática visitas a lares de idosos, abrigos, hospitais, escolas e casas de recuperação com cuidado real.</div></div></div>
         </div>
       </section>
 
@@ -528,11 +528,11 @@ export default function Home() {
             <h2 className="sec-h2">Como funciona a <span>Cruzada?</span><span className="sec-h2-line" style={{margin:'14px auto 0'}}></span></h2>
           </div>
           <div className="como-steps r2">
-            <div className="como-step"><div className="como-step-num">01</div><div className="como-step-line"></div><div className="como-step-title">Treinamento</div><div className="como-step-desc">Antes do início, todos os voluntários passam por um treinamento prático — como compartilhar o Evangelho, como abordar pessoas e como registrar decisões.</div></div>
+            <div className="como-step"><div className="como-step-num">01</div><div className="como-step-line"></div><div className="como-step-title">Treinamento</div><div className="como-step-desc">Antes do início, todos os voluntários passam por um treinamento prático como compartilhar o Evangelho, como abordar pessoas e como registrar decisões.</div></div>
             <div className="como-step"><div className="como-step-num">02</div><div className="como-step-line"></div><div className="como-step-title">Divisão por Setores</div><div className="como-step-desc">A cidade é dividida em setores e bairros. Cada equipe recebe uma área específica para cobrir durante os 9 dias.</div></div>
-            <div className="como-step"><div className="como-step-num">03</div><div className="como-step-line"></div><div className="como-step-title">Ação Diária</div><div className="como-step-desc">Todos os dias as equipes saem juntas para suas regiões — visitando lares, orando pelas famílias, pregando nas praças.</div></div>
-            <div className="como-step"><div className="como-step-num">04</div><div className="como-step-line"></div><div className="como-step-title">Registro de Decisões</div><div className="como-step-desc">Cada pessoa que aceita Jesus tem seus dados registrados. Nenhuma ovelha se perde — cada uma é encaminhada a uma igreja local.</div></div>
-            <div className="como-step"><div className="como-step-num">05</div><div className="como-step-line"></div><div className="como-step-title">Culto da Cruzada</div><div className="como-step-desc">No encerramento, toda a cidade é convidada para o grande culto final — com louvor, pregação evangelística e apelo público.</div></div>
+            <div className="como-step"><div className="como-step-num">03</div><div className="como-step-line"></div><div className="como-step-title">Ação Diária</div><div className="como-step-desc">Todos os dias as equipes saem juntas para suas regiões visitando lares, orando pelas famílias, pregando nas praças.</div></div>
+            <div className="como-step"><div className="como-step-num">04</div><div className="como-step-line"></div><div className="como-step-title">Registro de Decisões</div><div className="como-step-desc">Cada pessoa que aceita Jesus tem seus dados registrados. Nenhuma ovelha se perde cada uma é encaminhada a uma igreja local.</div></div>
+            <div className="como-step"><div className="como-step-num">05</div><div className="como-step-line"></div><div className="como-step-title">Culto da Cruzada</div><div className="como-step-desc">No encerramento, toda a cidade é convidada para o grande culto final com louvor, pregação evangelística e apelo público.</div></div>
           </div>
         </div>
       </section>
@@ -560,7 +560,7 @@ export default function Home() {
           <div className="mapa-info">
             <span className="sec-eyebrow">Onde acontece</span>
             <h2 className="sec-h2">Ibirité, <span>Minas Gerais</span><span className="sec-h2-line"></span></h2>
-            <p className="mapa-desc">A Cruzada acontece em toda a cidade de Ibirité — nos bairros, ruas, praças, escolas e igrejas.</p>
+            <p className="mapa-desc">A Cruzada acontece em toda a cidade de Ibirité nos bairros, ruas, praças, escolas e igrejas.</p>
             <div className="mapa-detalhes">
               <div className="mapa-detalhe-item"><div className="mapa-detalhe-label">Cidade</div><div className="mapa-detalhe-val">Ibirité, MG</div></div>
               <div className="mapa-detalhe-item"><div className="mapa-detalhe-label">Período</div><div className="mapa-detalhe-val">27 Jun a 05 Jul · 2026</div></div>
@@ -580,11 +580,11 @@ export default function Home() {
           <h2 className="sec-h2">A cidade que <span>vamos alcançar</span><span className="sec-h2-line" style={{margin:'14px auto 0'}}></span></h2>
         </div>
         <div className="galeria-grid r2">
-          <div className="galeria-item galeria-item--tall"><img src="https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&q=80" alt="Cidade" /><div className="galeria-overlay"><span>Ibirité, MG</span></div></div>
-          <div className="galeria-item"><img src="https://images.unsplash.com/photo-1529390079861-591de354faf5?w=800&q=80" alt="Evangelismo" /><div className="galeria-overlay"><span>Evangelismo nas ruas</span></div></div>
-          <div className="galeria-item"><img src="https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=800&q=80" alt="Ação Social" /><div className="galeria-overlay"><span>Ação Social</span></div></div>
-          <div className="galeria-item"><img src="https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?w=800&q=80" alt="Culto" /><div className="galeria-overlay"><span>Culto da Cruzada</span></div></div>
-          <div className="galeria-item"><img src="https://images.unsplash.com/photo-1541516160071-4bb0c5af65ba?w=800&q=80" alt="Missão" /><div className="galeria-overlay"><span>Missão em campo</span></div></div>
+          <div className="galeria-item galeria-item--tall"><img src="/gal1.png" alt="Cidade" /><div className="galeria-overlay"><span>Ibirité, MG</span></div></div>
+          <div className="galeria-item"><img src="/gal2.jpeg" alt="Evangelismo" /><div className="galeria-overlay"><span>Evangelismo nas ruas</span></div></div>
+          <div className="galeria-item"><img src="/gal3.jpeg" alt="Ação Social" /><div className="galeria-overlay"><span>Ação Social</span></div></div>
+          <div className="galeria-item"><img src="/gal4.jpeg" alt="Culto" /><div className="galeria-overlay"><span>Culto da Cruzada</span></div></div>
+          <div className="galeria-item"><img src="/gal5.jpeg" alt="Missão" /><div className="galeria-overlay"><span>Missão em Campo</span></div></div>
         </div>
       </section>
 
@@ -593,12 +593,12 @@ export default function Home() {
           <div className="paratodos-left r">
             <span className="sec-eyebrow">A vontade de Deus</span>
             <h2 className="sec-h2">O Evangelho é<br /><span>para todos.</span><span className="sec-h2-line"></span></h2>
-            <p className="paratodos-desc">Não existe pessoa fora do alcance do amor de Deus. Não importa o passado, a origem, os erros cometidos — o Evangelho de Jesus Cristo é uma mensagem de perdão, restauração e vida nova para cada ser humano.</p>
-            <p className="paratodos-desc">Jesus morreu na cruz não apenas pelos religiosos — mas por todos, sem exceção. O ladrão na cruz, a mulher adúltera, o cobrador de impostos: todos encontraram graça diante de Jesus.</p>
+            <p className="paratodos-desc">Não existe pessoa fora do alcance do amor de Deus. Não importa o passado, a origem, os erros cometidos o Evangelho de Jesus Cristo é uma mensagem de perdão, restauração e vida nova para cada ser humano.</p>
+            <p className="paratodos-desc">Jesus morreu na cruz não apenas pelos religiosos mas por todos, sem exceção. O ladrão na cruz, a mulher adúltera, o cobrador de impostos: todos encontraram graça diante de Jesus.</p>
             <blockquote className="paratodos-quote">"Deus quer que todos os homens sejam salvos e cheguem ao pleno conhecimento da verdade."<cite>1 Timóteo 2:4</cite></blockquote>
           </div>
           <div className="paratodos-right r2">
-            <img src="https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=600&q=80" alt="Evangelho para todos" />
+            <img src="/ev1.jpg" alt="Evangelho para todos" />
           </div>
         </div>
       </section>
@@ -607,7 +607,7 @@ export default function Home() {
         <div className="oracao-inner r">
           <span className="sec-eyebrow">Junte-se em oração</span>
           <h2 className="oracao-title">Ore pela <span>Cruzada Ibirité 2026</span></h2>
-          <p className="oracao-desc">A oração é o alicerce de tudo. Antes de qualquer ação, antes de qualquer equipe sair às ruas — é a oração que prepara o coração das pessoas e abre portas que nenhum homem pode abrir.</p>
+          <p className="oracao-desc">A oração é o alicerce de tudo. Antes de qualquer ação, antes de qualquer equipe sair às ruas é a oração que prepara o coração das pessoas e abre portas que nenhum homem pode abrir.</p>
           <div className="oracao-pontos">
             <div className="oracao-ponto"><div className="oracao-ponto-dot"></div><div>Ore pela <strong>unidade das igrejas</strong> e dos líderes envolvidos</div></div>
             <div className="oracao-ponto"><div className="oracao-ponto-dot"></div><div>Ore pelo <strong>coração das pessoas</strong> de Ibirité</div></div>
@@ -624,7 +624,7 @@ export default function Home() {
             <span className="sec-eyebrow">Sobre a Missão</span>
             <h2 className="sec-h2">A missão que vai<br /><span>transformar Ibirité.</span><span className="sec-h2-line"></span></h2>
             <div className="sobre-list">
-              <div className="sobre-item"><div className="sobre-item-dot">1</div><div className="sobre-item-body"><div className="sobre-item-title">Unidade das Igrejas</div><div className="sobre-item-desc">Diferentes denominações unidas por um único propósito — alcançar toda Ibirité com o Evangelho.</div></div></div>
+              <div className="sobre-item"><div className="sobre-item-dot">1</div><div className="sobre-item-body"><div className="sobre-item-title">Unidade das Igrejas</div><div className="sobre-item-desc">Diferentes denominações unidas por um único propósito alcançar toda Ibirité com o Evangelho.</div></div></div>
               <div className="sobre-item"><div className="sobre-item-dot">2</div><div className="sobre-item-body"><div className="sobre-item-title">Evangelismo Diário</div><div className="sobre-item-desc">Ação contínua nos 9 dias com equipes atuando simultaneamente em todos os setores da cidade.</div></div></div>
               <div className="sobre-item"><div className="sobre-item-dot">3</div><div className="sobre-item-body"><div className="sobre-item-title">Colheita e Consolidação</div><div className="sobre-item-desc">Cada decisão registrada, acompanhada em 48h, encaminhada para uma igreja e discipulada.</div></div></div>
             </div>
@@ -636,7 +636,7 @@ export default function Home() {
               <div className="stat-badge"><div className="stat-badge-num">24h</div><div className="stat-badge-label">Prazo de<br />Consolidação</div></div>
             </div>
             <div className="sobre-img-wrap">
-              <img src="https://images.unsplash.com/photo-1541516160071-4bb0c5af65ba?w=800&q=70" alt="Missão" />
+              <img src="/missao1.jpeg" alt="Missão" />
             </div>
           </div>
         </div>
@@ -677,7 +677,7 @@ export default function Home() {
               <tr><td><span className="ag-day">02 Jul</span></td><td><span className="ag-weekday">Quinta</span></td><td><span className="ag-event">Praças & Ruas</span></td><td className="ag-desc-td">Louvor ao ar livre, pregação direta e oração por pessoas.</td><td className="ag-badge-td"><span>Praças</span></td></tr>
               <tr><td><span className="ag-day">03 Jul</span></td><td><span className="ag-weekday">Sexta</span></td><td><span className="ag-event">Evangelismo Geral</span></td><td className="ag-desc-td">Todos os setores em ação simultânea pela cidade.</td><td className="ag-badge-td"><span>Geral</span></td></tr>
               <tr><td><span className="ag-day">04 Jul</span></td><td><span className="ag-weekday">Sábado</span></td><td><span className="ag-event">Grande Concentração</span></td><td className="ag-desc-td">Culto público com toda a cidade e apelo evangelístico coletivo.</td><td className="ag-badge-td"><span>Concentração</span></td></tr>
-              <tr className="final"><td><span className="ag-day">05 Jul</span></td><td><span className="ag-weekday">Domingo · Encerramento</span></td><td><span className="ag-event">Culto da Cruzada</span></td><td className="ag-desc-td">Grande colheita final — louvor, palavra evangelística, apelo e consolidação.</td><td className="ag-badge-td"><span>Grande Final</span></td></tr>
+              <tr className="final"><td><span className="ag-day">05 Jul</span></td><td><span className="ag-weekday">Domingo · Encerramento</span></td><td><span className="ag-event">Culto da Cruzada</span></td><td className="ag-desc-td">Grande colheita final louvor, palavra evangelística, apelo e consolidação.</td><td className="ag-badge-td"><span>Grande Final</span></td></tr>
             </tbody>
           </table>
         </div>

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Home from './pages/Home'
+import CadastroVoluntario from './pages/CadastroVoluntario'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -11,6 +12,7 @@ export default function App() {
         <Route path="/" element={<Navigate to="/cruzada" replace />} />
         <Route path="/cruzada" element={<Home />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/cadastro-voluntario" element={<CadastroVoluntario />} />
         <Route
           path="/dashboard"
           element={

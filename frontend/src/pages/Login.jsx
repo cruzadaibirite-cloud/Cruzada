@@ -88,7 +88,7 @@ export default function Login() {
         <div style={s.leftInner}>
           {/* Logo */}
           <a href="/" style={s.logo}>
-            <div style={s.logoMark}>C</div>
+            <img src="/logo1.png" alt="Logo" style={{height:'34px', width:'auto'}} />
             <span style={s.logoText}>Cruzada <span style={{color:'#F97310'}}>Ibirité</span></span>
           </a>
 
@@ -121,7 +121,7 @@ export default function Login() {
 
           {/* Logo visível só no mobile */}
           <div style={s.mobileLogo} className="login-mobile-logo">
-            <div style={s.logoMark}>C</div>
+            <img src="/logo1.png" alt="Logo" style={{height:'34px', width:'auto'}} />
             <span style={{...s.logoText, color: '#1a1d27'}}>Cruzada <span style={{color:'#F97310'}}>Ibirité</span></span>
           </div>
 
@@ -129,7 +129,7 @@ export default function Login() {
             <>
               <div style={s.formTop}>
                 <div style={s.formTopIcon}>
-                  <div style={s.formTopIconMark}>C</div>
+                  <img src="/logo1.png" alt="Logo" style={{height:'48px', width:'auto'}} />
                 </div>
                 <h1 style={s.formTitle} className="login-form-title">Bem-vindo</h1>
                 <p style={s.formSub} className="login-form-sub">Entre com sua conta para acessar a plataforma da Cruzada</p>
@@ -183,7 +183,7 @@ export default function Login() {
                 <div style={s.orLine}/><span style={s.orText}>não tem acesso?</span><div style={s.orLine}/>
               </div>
 
-              <a href="/voluntario" style={s.btnOutline}>Quero fazer parte</a>
+              <a href="/cadastro-voluntario" style={s.btnOutline}>Quero fazer parte</a>
 
               <a href="/" style={s.backLink} className="login-back-link">← Voltar ao site</a>
             </>
@@ -245,12 +245,12 @@ const s = {
   leftBg: {
     position: 'absolute',
     inset: 0,
-    background: `url('https://images.unsplash.com/photo-1541516160071-4bb0c5af65ba?w=1400&q=85') center/cover no-repeat`,
+    background: `url('/login1.jpeg') center/cover no-repeat`,
   },
   leftOverlay: {
     position: 'absolute',
     inset: 0,
-    background: 'linear-gradient(180deg, rgba(10,12,18,0.75) 0%, rgba(10,12,18,0.5) 40%, rgba(10,12,18,0.9) 100%)',
+    background: 'rgba(0,0,0,0.75)',
   },
   leftInner: {
     position: 'relative',
