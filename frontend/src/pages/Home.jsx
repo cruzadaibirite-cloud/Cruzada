@@ -393,14 +393,16 @@ export default function Home() {
           .nav-logo-text { font-size: 13px; letter-spacing: 0; }
           .nav-hamburger span { width: 20px; }
           .hero { min-height: 100dvh; }
-          .hero-inner { grid-template-columns: 1fr; padding: 60px 24px 48px; gap: 0; }
+          .hero-inner { grid-template-columns: 1fr; padding: 60px 20px 48px; gap: 0; width: 100%; box-sizing: border-box; }
           .hero-right { display: none; }
-          .hero-title { font-size: clamp(30px, 8vw, 44px); }
-          .hero-left { text-align: center; }
-          .hero-sub { max-width: 100%; }
+          .hero-title { font-size: clamp(28px, 7vw, 44px); }
+          .hero-left { text-align: center; width: 100%; }
+          .hero-sub { max-width: 100%; font-size: 14px; }
           .hero-badge { justify-content: center; }
-          .hero-cd { justify-content: center; }
-          .hero-btns { justify-content: center; }
+          .hero-cd { justify-content: center; flex-wrap: wrap; gap: 8px; }
+          .hcd { min-width: 60px; padding: 10px 12px; }
+          .hcd-num { font-size: 22px; }
+          .hero-btns { justify-content: center; flex-wrap: wrap; }
           .sec-h2-line { margin-left: auto; margin-right: auto; }
           section { padding-left: 24px !important; padding-right: 24px !important; }
           .setores-cards, .setores-grid, .consolid-inner, .consolid-steps, .paratodos-inner, .mapa-inner, .dep-grid { grid-template-columns: 1fr !important; }
