@@ -4,6 +4,8 @@
 
 - **SEMPRE perguntar** ao usuário se deseja fazer commit e push antes de executar qualquer `git commit` ou `git push`.
 - **NUNCA fazer commit ou push automaticamente** sem confirmação explícita do usuário.
+- **Mensagens de commit** devem sempre iniciar com a versão (`v1`, `v2`, `v3`...) seguida de um detalhamento do que foi feito. Exemplo: `v3 - Adiciona tela de login, corrige estilos do header e configura Supabase Auth`.
+- O número da versão deve ser incrementado a cada commit.
 
 ## Stack
 
