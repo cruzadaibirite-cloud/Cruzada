@@ -347,7 +347,7 @@ const s = {
     gap: '10px',
   },
   headerTitle: {
-    fontSize: '20px',
+    fontSize: '18px',
     fontWeight: 900,
     color: '#fff',
     textTransform: 'uppercase',
