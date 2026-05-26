@@ -16,7 +16,7 @@ const mobileStyle = `
   @media (max-width: 768px) {
     .cad-container { padding: 24px 16px !important; }
     .cad-grid { grid-template-columns: 1fr !important; }
-    .cad-header { padding: 32px 16px 24px !important; }
+    .cad-header { padding: 0 20px !important; }
   }
 `
 
