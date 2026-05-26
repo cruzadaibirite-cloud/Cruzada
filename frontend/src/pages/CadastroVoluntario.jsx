@@ -17,6 +17,8 @@ const mobileStyle = `
     .cad-container { padding: 24px 16px !important; }
     .cad-grid { grid-template-columns: 1fr !important; }
     .cad-header { padding: 0 20px !important; }
+    .cad-header-nav { height: 48px !important; }
+    .cad-header-title { font-size: 11px !important; }
   }
 `
 
@@ -163,10 +165,10 @@ export default function CadastroVoluntario() {
 
       {/* Header */}
       <div style={s.header} className="cad-header">
-        <div style={s.headerNav}>
+        <div style={s.headerNav} className="cad-header-nav">
           <div style={s.headerLogo}>
             <img src="/logo1.png" alt="Logo" style={{ height: '38px', width: 'auto' }} />
-            <span style={s.headerTitle}>Cruzada <span style={{ color: '#F97310' }}>Ibirité</span></span>
+            <span style={s.headerTitle} className="cad-header-title">Cruzada <span style={{ color: '#F97310' }}>Ibirité</span></span>
           </div>
           <a href="/cruzada" style={s.backLink}>← Voltar</a>
         </div>
