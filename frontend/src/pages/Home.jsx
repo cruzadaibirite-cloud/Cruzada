@@ -450,7 +450,7 @@ export default function Home() {
           <li><a href="#missao">Missão</a></li>
         </ul>
         <div className="nav-right">
-          <button className="btn-nav">Entrar</button>
+          <button className="btn-nav">Voluntariar</button>
           <button className="nav-hamburger" id="nav-hamburger" aria-label="Menu">
             <span></span><span></span><span></span>
           </button>
@@ -464,7 +464,7 @@ export default function Home() {
         <a href="#ibirite">Ibirité</a>
         <a href="#evangelho">Evangelho</a>
         <a href="#missao">Missão</a>
-        <a href="#" id="btn-entrar-mobile" style={{color:'var(--orange)',fontWeight:800,borderBottom:'none',marginTop:8}}>Entrar</a>
+        <a href="#" id="btn-entrar-mobile" style={{color:'var(--orange)',fontWeight:800,borderBottom:'none',marginTop:8}}>Voluntariar</a>
       </div>
 
       <section className="hero" id="inicio">

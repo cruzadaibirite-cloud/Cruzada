@@ -191,7 +191,7 @@ export default function CadastroVoluntario() {
               {field('Nome Completo', <input style={s.input} required value={form.nome_completo} onChange={e => set('nome_completo', e.target.value)} placeholder="Seu nome completo" />)}
               {field('Idade', <input style={s.input} required type="number" min="16" max="99" value={form.idade} onChange={e => set('idade', e.target.value)} placeholder="Sua idade" />)}
               {field('WhatsApp com DDD', <input style={s.input} required value={form.whatsapp} onChange={e => set('whatsapp', e.target.value)} placeholder="(31) 99999-9999" />)}
-              {field('Instagram', <input style={s.input} value={form.instagram} onChange={e => set('instagram', e.target.value)} placeholder="@seuinstagram" onFocus={() => { if (!instaConfirmed.current) setShowInstaModal(true) }} />)}
+              {field('Instagram', <input style={s.input} required value={form.instagram} onChange={e => set('instagram', e.target.value)} placeholder="@seuinstagram" onFocus={() => { if (!instaConfirmed.current) setShowInstaModal(true) }} />)}
               {field('Cidade, Estado, País', (
                 <div style={{ position: 'relative' }}>
                   <input
@@ -246,7 +246,7 @@ export default function CadastroVoluntario() {
                       ))}
                     </div>
                   ))}
-                  {form.conjuge_na_missao === 'nao' && field('Se não, por quê?', <textarea style={s.textarea} value={form.motivo_conjuge_ausente} onChange={e => set('motivo_conjuge_ausente', e.target.value)} placeholder="Explique o motivo" />, true)}
+                  {form.conjuge_na_missao === 'nao' && field('Se não, por quê?', <textarea style={s.textarea} required value={form.motivo_conjuge_ausente} onChange={e => set('motivo_conjuge_ausente', e.target.value)} placeholder="Explique o motivo" />, true)}
                 </>
               )}
             </div>
@@ -285,7 +285,7 @@ export default function CadastroVoluntario() {
             </div>
             {form.outras_competencias && (
               <div style={{ marginTop: '16px' }}>
-                {field('Outra competência', <textarea style={s.textarea} value={form.outra_competencia_descricao} onChange={e => set('outra_competencia_descricao', e.target.value)} placeholder="Descreva sua competência" />, true)}
+                {field('Outra competência', <textarea style={s.textarea} required value={form.outra_competencia_descricao} onChange={e => set('outra_competencia_descricao', e.target.value)} placeholder="Descreva sua competência" />, true)}
               </div>
             )}
           </div>

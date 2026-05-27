@@ -61,7 +61,7 @@ export default function Login() {
     setLoading(true)
     try {
       await signIn(email, password)
-      navigate('/dashboard')
+      navigate('/sistema')
     } catch {
       setError('E-mail ou senha incorretos.')
     } finally {
