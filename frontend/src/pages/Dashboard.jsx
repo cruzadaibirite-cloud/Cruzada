@@ -220,6 +220,7 @@ export default function Dashboard() {
           .dash-kpi-grid { grid-template-columns: 1fr 1fr !important; }
           .dash-mid-grid { grid-template-columns: 1fr !important; }
           .dash-bot-grid { grid-template-columns: 1fr !important; }
+          .dash-check-grid { grid-template-columns: 1fr !important; }
           .dash-faixa-etaria { margin-bottom: 24px !important; }
         }
         @media (min-width: 769px) {
@@ -736,7 +737,7 @@ export default function Dashboard() {
               {/* Seção: Competências */}
               <div style={s.formSection}>
                 <h3 style={s.formSectionTitle}>Competências</h3>
-                <div style={s.checkGrid}>
+                <div style={s.checkGrid} className="dash-check-grid">
                   {Object.entries(COMPETENCIAS_LABEL).map(([key, label]) => (
                     <label key={key} style={{ ...s.checkLabel, opacity: (editando ? formEdit[key] : selected[key]) ? 1 : 0.35, cursor: editando ? 'pointer' : 'default' }}>
                       <input
