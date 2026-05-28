@@ -221,6 +221,7 @@ export default function Dashboard() {
           .dash-mid-grid { grid-template-columns: 1fr !important; }
           .dash-bot-grid { grid-template-columns: 1fr !important; }
           .dash-check-grid { grid-template-columns: 1fr !important; }
+          .dash-form-grid { grid-template-columns: 1fr !important; }
           .dash-faixa-etaria { margin-bottom: 24px !important; }
         }
         @media (min-width: 769px) {
@@ -629,7 +630,7 @@ export default function Dashboard() {
                     )}
                   </div>
                 </div>
-                <div style={s.formGrid}>
+                <div style={s.formGrid} className="dash-form-grid">
                   {editando ? (
                     <>
                       {editField('Nome Completo', 'nome_completo', formEdit, setField)}
@@ -684,7 +685,7 @@ export default function Dashboard() {
               {/* Seção: Igreja */}
               <div style={s.formSection}>
                 <h3 style={s.formSectionTitle}>Igreja</h3>
-                <div style={s.formGrid}>
+                <div style={s.formGrid} className="dash-form-grid">
                   {editando ? (
                     <>
                       {editField('Nome da Igreja', 'igreja', formEdit, setField)}
@@ -708,7 +709,7 @@ export default function Dashboard() {
               {/* Seção: Saúde e Experiência */}
               <div style={s.formSection}>
                 <h3 style={s.formSectionTitle}>Saúde e Experiência</h3>
-                <div style={s.formGrid}>
+                <div style={s.formGrid} className="dash-form-grid">
                   {editando ? (
                     <>
                       {editField('Nome de Emergência', 'nome_emergencia', formEdit, setField)}
