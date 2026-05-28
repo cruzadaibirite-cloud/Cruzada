@@ -1,4 +1,12 @@
 import { useEffect, useRef } from 'react'
+import L from 'leaflet'
+
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
 
 export default function MapaLocal({ local, height }) {
   const mapRef = useRef(null)
@@ -6,27 +14,18 @@ export default function MapaLocal({ local, height }) {
   const markerRef = useRef(null)
 
   useEffect(() => {
-    import('leaflet').then(L => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove()
-        mapInstanceRef.current = null
-      }
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove()
+      mapInstanceRef.current = null
+    }
 
-      delete L.Icon.Default.prototype._getIconUrl
-      L.Icon.Default.mergeOptions({
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-      })
+    const map = L.map(mapRef.current).setView([-20.0509, -44.0558], 13)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+    }).addTo(map)
+    mapInstanceRef.current = map
 
-      const map = L.map(mapRef.current).setView([-20.0509, -44.0558], 13)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-      }).addTo(map)
-      mapInstanceRef.current = map
-
-      if (local) geocodificar(L, map, local)
-    })
+    if (local) geocodificar(map, local)
 
     return () => {
       if (mapInstanceRef.current) {
@@ -38,10 +37,10 @@ export default function MapaLocal({ local, height }) {
 
   useEffect(() => {
     if (!local || !mapInstanceRef.current) return
-    import('leaflet').then(L => geocodificar(L, mapInstanceRef.current, local))
+    geocodificar(mapInstanceRef.current, local)
   }, [local])
 
-  async function geocodificar(L, map, local) {
+  async function geocodificar(map, local) {
     if (!local.endereco) return
     const query = `${local.endereco}, ${local.bairro || ''}, Ibirité, MG, Brasil`
     try {
