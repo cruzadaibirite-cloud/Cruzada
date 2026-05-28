@@ -1,13 +1,47 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@import 'leaflet/dist/leaflet.css';
 
-body {
+html, body {
   margin: 0;
   padding: 0;
-  font-family: 'Nunito', 'Segoe UI', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
+  height: 100%;
 }
 
 #root {
-  width: 100%;
-  min-height: 100vh;
+  height: 100%;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 99px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+*::-webkit-scrollbar-button:start:decrement,
+*::-webkit-scrollbar-button:end:increment,
+*::-webkit-scrollbar-button:start:increment,
+*::-webkit-scrollbar-button:end:decrement {
+  display: none;
 }

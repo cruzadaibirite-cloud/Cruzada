@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import 'leaflet/dist/leaflet.css'
 
 export default function MapaLocal({ local, height }) {
   const mapRef = useRef(null)
