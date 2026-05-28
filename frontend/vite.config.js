@@ -7,14 +7,4 @@ export default defineConfig({
   server: {
     port: 5182,
   },
-  build: {
-    rollupOptions: {
-      external: ['leaflet'],
-      output: {
-        globals: {
-          leaflet: 'L',
-        },
-      },
-    },
-  },
 })
