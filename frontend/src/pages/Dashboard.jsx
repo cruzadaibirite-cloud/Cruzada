@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import MapaLocal from '../components/MapaLocal'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -6,6 +7,8 @@ import { supabase } from '../lib/supabase'
 const MENU = [
   { key: 'voluntarios', label: 'Voluntários', path: '/sistema/voluntario' },
   { key: 'usuarios', label: 'Usuários', path: '/sistema/usuarios' },
+  { key: 'locais', label: 'Locais', path: '/sistema/locais' },
+  { key: 'dashboard', label: 'Dashboard', path: '/sistema/dashboard' },
 ]
 
 const CAMPOS_OBRIGATORIOS = [
@@ -46,7 +49,7 @@ export default function Dashboard() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : 'voluntarios'
+  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
   const [voluntarios, setVoluntarios] = useState([])
   const [loadingVol, setLoadingVol] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -59,6 +62,14 @@ export default function Dashboard() {
   const [editando, setEditando] = useState(false)
   const [formEdit, setFormEdit] = useState({})
   const [salvando, setSalvando] = useState(false)
+  const [locais, setLocais] = useState([])
+  const [buscaLocal, setBuscaLocal] = useState('')
+  const [localSelecionado, setLocalSelecionado] = useState(null)
+  const [viewLocais, setViewLocais] = useState('mapa')
+  const [menuMobileAberto, setMenuMobileAberto] = useState(false)
+  const [tooltip, setTooltip] = useState(null)
+  const [filtro, setFiltro] = useState(null)
+  const tooltipTimer = useRef(null)
 
   useEffect(() => {
     async function carregarNome() {
@@ -75,9 +86,16 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    if (menu === 'voluntarios') carregarVoluntarios()
+    if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
     if (menu === 'usuarios') carregarUsuarios()
+    if (menu === 'locais') carregarLocais()
   }, [menu])
+
+  async function carregarLocais() {
+    const { data } = await supabase.from('locais').select('*').order('nome')
+    setLocais(data || [])
+  }
+
 
   async function carregarUsuarios() {
     setLoadingUsers(true)
@@ -140,6 +158,7 @@ export default function Dashboard() {
       faz_filmagens: !!formEdit.faz_filmagens,
       outras_competencias: !!formEdit.outras_competencias,
       outra_competencia_descricao: formEdit.outra_competencia_descricao || null,
+      sexo: formEdit.sexo || null,
     }
     const { error } = await supabase.from('voluntarios').update(payload).eq('id', selected.id)
     setSalvando(false)
@@ -187,27 +206,78 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Header */}
-      <div style={s.header}>
-        <div style={s.headerLogo}>
-          <img src="/logo1.png" alt="Logo" style={{ height: '36px', width: 'auto' }} />
-          <span style={s.headerTitle}>Cruzada <span style={{ color: '#F97310' }}>Ibirité</span></span>
+      <style>{`
+        @media (max-width: 768px) {
+          .dash-sidebar { display: none !important; }
+          .dash-profile-email { display: none !important; }
+          .dash-profile-chevron { display: none !important; }
+          .dash-profile-btn { display: none !important; }
+          .dash-header { padding: 0 16px !important; }
+          .dash-header-title { font-size: 15px !important; }
+          .dash-header-logo img { height: 24px !important; }
+          .dash-main { padding: 20px 16px 90px !important; }
+          .dash-bottomnav { display: flex !important; }
+          .dash-kpi-grid { grid-template-columns: 1fr 1fr !important; }
+          .dash-mid-grid { grid-template-columns: 1fr !important; }
+          .dash-bot-grid { grid-template-columns: 1fr !important; }
+          .dash-faixa-etaria { margin-bottom: 24px !important; }
+        }
+        @media (min-width: 769px) {
+          .dash-bottomnav { display: none !important; }
+        }
+      `}</style>
+
+      {/* Tooltip hover */}
+      {tooltip && (
+        <div
+          onMouseEnter={() => clearTimeout(tooltipTimer.current)}
+          onMouseLeave={() => { tooltipTimer.current = setTimeout(() => tooltipTimer.current = setTimeout(() => setTooltip(null), 150), 300) }}
+          style={{ position: 'fixed', top: tooltip.y, left: tooltip.x, zIndex: 500, background: '#fff', borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.18)', border: '1px solid #e5e7eb', minWidth: '280px', maxWidth: '340px', maxHeight: '280px', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '2px solid #F97310' }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 800, color: '#0f1117', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>{tooltip.titulo}</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>Cidade</th>
+                <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', fontSize: '11px', letterSpacing: '0.5px' }}>{tooltip.lista.length}</th>
+              </tr>
+            </thead>
+          </table>
+          <div style={{ overflowY: 'auto', maxHeight: '220px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+              <tbody>
+                {tooltip.lista.length === 0 && (
+                  <tr><td colSpan={3} style={{ padding: '10px 12px', color: '#9ca3af' }}>Nenhuma pessoa.</td></tr>
+                )}
+                {tooltip.lista.map((v, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                    <td style={{ padding: '7px 12px', fontWeight: 700, color: '#0f1117' }}>{v.nome_completo}</td>
+                    <td style={{ padding: '7px 12px', color: '#6b7280' }}>{v.cidade_estado_pais?.split(',')[0]}</td>
+                    <td style={{ padding: '7px 12px', textAlign: 'center', color: '#9ca3af' }}>{v.idade}a</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div style={{ position: 'relative' }}>
+      )}
+
+      {/* Header */}
+      <div style={s.header} className="dash-header">
+        <div style={s.headerLogo} className="dash-header-logo">
+          <img src="/logo1.png" alt="Logo" style={{ height: '22px', width: 'auto' }} />
+          <span style={s.headerTitle} className="dash-header-title">Cruzada <span style={{ color: '#F97310' }}>Ibirité</span></span>
+        </div>
+        <div style={{ position: 'relative' }} className="dash-profile-btn">
           <button style={s.profileBtn} onClick={() => setDropdownOpen(o => !o)}>
             <div style={s.profileAvatar}>{getInitials(nomeUsuario || user?.email)}</div>
-            <span style={s.profileEmail}>{nomeUsuario || user?.email}</span>
-            <span style={s.profileChevron}>▾</span>
+            <span style={s.profileEmail} className="dash-profile-email">{nomeUsuario || user?.email}</span>
+            <span style={s.profileChevron} className="dash-profile-chevron">▾</span>
           </button>
           {dropdownOpen && (
             <div style={s.dropdown}>
-              <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false) }}>
-                Editar usuário
-              </button>
+              <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false) }}>Editar usuário</button>
               <div style={s.dropdownDivider} />
-              <button style={{ ...s.dropdownItem, color: '#ef4444' }} onClick={handleSignOut}>
-                Sair
-              </button>
+              <button style={{ ...s.dropdownItem, color: '#ef4444' }} onClick={handleSignOut}>Sair</button>
             </div>
           )}
         </div>
@@ -216,7 +286,7 @@ export default function Dashboard() {
       <div style={s.body}>
 
         {/* Sidebar */}
-        <div style={s.sidebar}>
+        <div style={s.sidebar} className="dash-sidebar">
           <p style={s.sidebarLabel}>Menu</p>
           {MENU.map(item => (
             <button
@@ -230,12 +300,282 @@ export default function Dashboard() {
         </div>
 
         {/* Conteúdo */}
-        <div style={s.main}>
+        <div style={s.main} className="dash-main">
+
+          {menu === 'dashboard' && (() => {
+            const base = filtro ? filtro.lista : voluntarios
+            const total = base.length
+            const aprovados = base.filter(v => v.status === 'aprovado').length
+            const pendentes = base.filter(v => !v.status || v.status === 'pendente').length
+            const reprovados = base.filter(v => v.status === 'reprovado').length
+            const masculino = base.filter(v => v.sexo === 'Masculino').length
+            const feminino = base.filter(v => v.sexo === 'Feminino').length
+            const foraMG = base.filter(v => v.cidade_estado_pais && !v.cidade_estado_pais.includes('Minas Gerais')).length
+            const missionarios = base.filter(v => v.ja_participou_missao === true).length
+            const solteiros = base.filter(v => v.estado_civil === 'solteiro').length
+            const casados = base.filter(v => v.estado_civil === 'casado').length
+            const incompletos = base.filter(v => camposFaltando(v).length > 0).length
+
+            function hover(e, titulo, lista) {
+              const rect = e.currentTarget.getBoundingClientRect()
+              const tooltipW = 340
+              const tooltipH = 280
+              let x = rect.left
+              let y = rect.bottom + 8
+              if (x + tooltipW > window.innerWidth - 8) x = window.innerWidth - tooltipW - 8
+              if (x < 8) x = 8
+              if (y + tooltipH > window.innerHeight - 8) y = rect.top - tooltipH - 8
+              clearTimeout(tooltipTimer.current)
+              tooltipTimer.current = setTimeout(() => setTooltip({ titulo, lista, x, y }), 1000)
+            }
+            function clique(titulo, lista) {
+              if (filtro?.titulo === titulo) { setFiltro(null) } else { setFiltro({ titulo, lista }) }
+            }
+            function itemStyle(titulo) {
+              return filtro?.titulo === titulo
+                ? { cursor: 'pointer' }
+                : { cursor: 'pointer' }
+            }
+
+            const cidades = {}
+            base.forEach(v => {
+              if (!v.cidade_estado_pais) return
+              const cidade = v.cidade_estado_pais.split(',')[0].trim()
+              cidades[cidade] = (cidades[cidade] || 0) + 1
+            })
+            const topCidades = Object.entries(cidades).sort((a, b) => b[1] - a[1])
+            const maxCidadeReal = topCidades.length > 0 ? topCidades[0][1] : 1
+
+            const competencias = [
+              { label: 'Mídia/Fotos', count: base.filter(v => v.tira_fotos).length },
+              { label: 'Filmagem', count: base.filter(v => v.faz_filmagens).length },
+              { label: 'Canto', count: base.filter(v => v.canta).length },
+              { label: 'Instrumento', count: base.filter(v => v.toca_instrumento).length },
+              { label: 'Inglês', count: base.filter(v => v.fala_ingles).length },
+              { label: 'Espanhol', count: base.filter(v => v.fala_espanhol).length },
+              { label: 'LIBRAS/Outros', count: base.filter(v => v.outras_competencias).length },
+            ].sort((a, b) => b.count - a.count)
+
+            const faixas = [
+              { label: '16–20', count: base.filter(v => v.idade >= 16 && v.idade <= 20).length },
+              { label: '21–25', count: base.filter(v => v.idade >= 21 && v.idade <= 25).length },
+              { label: '26–30', count: base.filter(v => v.idade >= 26 && v.idade <= 30).length },
+              { label: '31–40', count: base.filter(v => v.idade >= 31 && v.idade <= 40).length },
+              { label: '40+',   count: base.filter(v => v.idade > 40).length },
+            ]
+            const maxFaixa = Math.max(...faixas.map(f => f.count), 1)
+            const maxCidade = maxCidadeReal
+            const maxComp = Math.max(...competencias.map(c => c.count), 1)
+
+            const pct = (n, d) => d === 0 ? 0 : Math.round((n / d) * 100)
+
+            return (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                  <h2 style={{ ...s.pageTitle, marginBottom: 0 }}>Dashboard</h2>
+                  {filtro && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff4ec', border: '1.5px solid #F97310', borderRadius: '20px', padding: '4px 12px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#F97310' }}>Filtrando: {filtro.titulo} ({filtro.lista.length})</span>
+                      <button onClick={() => setFiltro(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontWeight: 900, fontSize: '14px', padding: '0', lineHeight: 1 }}>✕</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* KPIs */}
+                <div className="dash-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
+                  {[
+                    { label: 'Total', value: total, color: '#0f1117', bg: '#fff', border: '#e5e7eb', lista: voluntarios },
+                    { label: 'Aprovados', value: aprovados, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', lista: voluntarios.filter(v => v.status === 'aprovado') },
+                    { label: 'Pendentes', value: pendentes, color: '#F97310', bg: '#fff4ec', border: '#fed7aa', lista: voluntarios.filter(v => !v.status || v.status === 'pendente') },
+                    { label: 'Reprovados', value: reprovados, color: '#dc2626', bg: '#fef2f2', border: '#fecaca', lista: voluntarios.filter(v => v.status === 'reprovado') },
+                  ].map(k => (
+                    <div key={k.label}
+                      onMouseEnter={e => hover(e, k.label, k.lista)}
+                      onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
+                      onClick={() => clique(k.label, k.lista)}
+                      style={{ background: k.bg, border: `1.5px solid ${k.border}`, borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', ...itemStyle(k.label) }}>
+                      <div style={{ fontSize: '12px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>{k.label}</div>
+                      <div style={{ fontSize: '36px', fontWeight: 900, color: k.color, lineHeight: 1 }}>{k.value}</div>
+                      {k.label !== 'Total' && <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '6px' }}>{pct(k.value, total)}% do total</div>}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Linha 2 */}
+                <div className="dash-mid-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+
+                  {/* Sexo */}
+                  <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Sexo</div>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', ...itemStyle('Masculino') }}
+                        onMouseEnter={e => hover(e, 'Masculino', base.filter(v => v.sexo === 'Masculino'))}
+                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
+                        onClick={() => clique('Masculino', voluntarios.filter(v => v.sexo === 'Masculino'))}>
+                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#3b82f6' }}>{masculino}</div>
+                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Masculino</div>
+                      </div>
+                      <div style={{ width: '1px', background: '#f3f4f6' }} />
+                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', ...itemStyle('Feminino') }}
+                        onMouseEnter={e => hover(e, 'Feminino', base.filter(v => v.sexo === 'Feminino'))}
+                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
+                        onClick={() => clique('Feminino', voluntarios.filter(v => v.sexo === 'Feminino'))}>
+                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#ec4899' }}>{feminino}</div>
+                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Feminino</div>
+                      </div>
+                    </div>
+                    <div style={{ height: '10px', borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden', display: 'flex' }}>
+                      <div style={{ width: `${pct(masculino, total)}%`, background: '#3b82f6', transition: 'width 0.5s' }} />
+                      <div style={{ width: `${pct(feminino, total)}%`, background: '#ec4899', transition: 'width 0.5s' }} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
+                      <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 700 }}>{pct(masculino, total)}%</span>
+                      <span style={{ fontSize: '11px', color: '#ec4899', fontWeight: 700 }}>{pct(feminino, total)}%</span>
+                    </div>
+                  </div>
+
+                  {/* Missão anterior */}
+                  <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Missão anterior</div>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', ...itemStyle('Já foram em missão') }}
+                        onMouseEnter={e => hover(e, 'Já foram em missão', base.filter(v => v.ja_participou_missao === true))}
+                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
+                        onClick={() => clique('Já foram em missão', voluntarios.filter(v => v.ja_participou_missao === true))}>
+                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#F97310' }}>{missionarios}</div>
+                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Já foram</div>
+                      </div>
+                      <div style={{ width: '1px', background: '#f3f4f6' }} />
+                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', ...itemStyle('Primeira missão') }}
+                        onMouseEnter={e => hover(e, 'Primeira missão', base.filter(v => !v.ja_participou_missao))}
+                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
+                        onClick={() => clique('Primeira missão', voluntarios.filter(v => !v.ja_participou_missao))}>
+                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#6b7280' }}>{total - missionarios}</div>
+                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Primeira vez</div>
+                      </div>
+                    </div>
+                    <div style={{ height: '10px', borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden', display: 'flex' }}>
+                      <div style={{ width: `${pct(missionarios, total)}%`, background: '#F97310' }} />
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#F97310', fontWeight: 700, marginTop: '6px' }}>{pct(missionarios, total)}% com experiência</div>
+                  </div>
+
+                  {/* Estado civil + extras */}
+                  <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Perfil geral</div>
+                    {[
+                      { label: 'Solteiros', value: solteiros, color: '#8b5cf6', lista: voluntarios.filter(v => v.estado_civil === 'solteiro') },
+                      { label: 'Casados', value: casados, color: '#F97310', lista: voluntarios.filter(v => v.estado_civil === 'casado') },
+                      { label: 'Fora de MG', value: foraMG, color: '#3b82f6', lista: voluntarios.filter(v => v.cidade_estado_pais && !v.cidade_estado_pais.includes('Minas Gerais')) },
+                      { label: 'Incompletos', value: incompletos, color: '#ef4444', lista: voluntarios.filter(v => camposFaltando(v).length > 0) },
+                    ].map(item => (
+                      <div key={item.label}
+                        onMouseEnter={e => hover(e, item.label, base.filter(v => item.lista.find(x => x.id === v.id)))}
+                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
+                        onClick={() => clique(item.label, item.lista)}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', cursor: 'pointer', padding: '4px 6px', borderRadius: '8px', ...itemStyle(item.label) }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{item.label}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ width: '80px', height: '6px', borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden' }}>
+                            <div style={{ width: `${pct(item.value, total)}%`, height: '100%', background: item.color }} />
+                          </div>
+                          <span style={{ fontSize: '13px', fontWeight: 800, color: item.color, minWidth: '24px', textAlign: 'right' }}>{item.value}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Linha 3 */}
+                <div className="dash-bot-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+
+                  {/* Cidades */}
+                  <div style={{ background: '#fff', borderRadius: '16px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <div style={{ background: 'transparent', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Cidades</div>
+                      {(() => { const barCidade = Math.min(24, Math.max(6, Math.floor(280 / (topCidades.length || 1)))); const itemHCidade = barCidade + 28; const totalHCidade = itemHCidade * topCidades.length + 12 * (topCidades.length - 1); const justifyCidade = totalHCidade <= 320 ? 'center' : 'flex-start'; return (
+                      <div style={{ overflowY: 'auto', height: '320px', paddingRight: '4px', display: 'flex', flexDirection: 'column', justifyContent: justifyCidade, gap: '12px' }}>
+                      {topCidades.map(([cidade, qtd]) => (
+                        <div key={cidade}
+                          onMouseEnter={e => hover(e, cidade, base.filter(v => v.cidade_estado_pais?.split(',')[0].trim() === cidade))}
+                          onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
+                          onClick={() => clique(cidade, voluntarios.filter(v => v.cidade_estado_pais?.split(',')[0].trim() === cidade))}
+                          style={{ cursor: 'pointer', borderRadius: '8px', ...itemStyle(cidade) }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{cidade}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 800, color: '#F97310' }}>{qtd}</span>
+                          </div>
+                          <div style={{ height: `${barCidade}px`, borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden' }}>
+                            <div style={{ width: `${pct(qtd, maxCidade)}%`, height: '100%', background: '#F97310' }} />
+                          </div>
+                        </div>
+                      ))}
+                      </div>) })()}
+                    </div>
+                  </div>
+
+                  {/* Competências */}
+                  <div style={{ background: '#fff', borderRadius: '16px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                    <div style={{ background: 'transparent', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Competências</div>
+                      {(() => { const compFiltradas = competencias.filter(c => c.count > 0); const barComp = Math.min(24, Math.max(6, Math.floor(280 / (compFiltradas.length || 1)))); const itemHComp = barComp + 28; const totalHComp = itemHComp * compFiltradas.length + 12 * (compFiltradas.length - 1); const justifyComp = totalHComp <= 320 ? 'center' : 'flex-start'; return (
+                      <div style={{ overflowY: 'auto', height: '320px', paddingRight: '4px', display: 'flex', flexDirection: 'column', justifyContent: justifyComp, gap: '12px' }}>
+                      {compFiltradas.map(c => {
+                        const compKey = c.label === 'Mídia/Fotos' ? 'tira_fotos' : c.label === 'Filmagem' ? 'faz_filmagens' : c.label === 'Canto' ? 'canta' : c.label === 'Instrumento' ? 'toca_instrumento' : c.label === 'Inglês' ? 'fala_ingles' : c.label === 'Espanhol' ? 'fala_espanhol' : 'outras_competencias'
+                        return <div key={c.label}
+                          onMouseEnter={e => hover(e, c.label, base.filter(v => v[compKey]))}
+                          onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
+                          onClick={() => clique(c.label, voluntarios.filter(v => v[compKey]))}
+                          style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: '8px', ...itemStyle(c.label) }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{c.label}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 800, color: '#8b5cf6' }}>{c.count}</span>
+                          </div>
+                          <div style={{ height: `${barComp}px`, borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden' }}>
+                            <div style={{ width: `${pct(c.count, maxComp)}%`, height: '100%', background: '#8b5cf6' }} />
+                          </div>
+                        </div>
+                      })}
+                      </div>) })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Faixa etária */}
+                <div className="dash-faixa-etaria" style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '32px', overflow: 'visible' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '20px' }}>Faixa etária</div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '160px' }}>
+                    {faixas.map(f => {
+                      const fLista = voluntarios.filter(v => {
+                        if (f.label === '16–20') return v.idade >= 16 && v.idade <= 20
+                        if (f.label === '21–25') return v.idade >= 21 && v.idade <= 25
+                        if (f.label === '26–30') return v.idade >= 26 && v.idade <= 30
+                        if (f.label === '31–40') return v.idade >= 31 && v.idade <= 40
+                        if (f.label === '40+') return v.idade > 40
+                        return false
+                      })
+                      const barH = maxFaixa === 0 ? 0 : Math.round((f.count / maxFaixa) * 100)
+                      return <div key={f.label}
+                        onMouseEnter={e => hover(e, `Faixa ${f.label}`, base.filter(v => fLista.find(x => x.id === v.id)))}
+                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
+                        onClick={() => clique(`Faixa ${f.label}`, fLista)}
+                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', ...itemStyle(`Faixa ${f.label}`) }}>
+                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f1117' }}>{f.count}</span>
+                        <div style={{ width: '100%', background: '#F97310', borderRadius: '6px 6px 0 0', height: `${barH}px`, minHeight: f.count > 0 ? '6px' : '0', transition: 'height 0.4s' }} />
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', marginTop: '4px' }}>{f.label}</span>
+                      </div>
+                    })}
+                  </div>
+                </div>
+              </>
+            )
+          })()}
 
           {menu === 'voluntarios' && !selected && (
             <>
               <h2 style={s.pageTitle}>Voluntários</h2>
               {loadingVol && <p style={s.info}>Carregando...</p>}
+
               {!loadingVol && voluntarios.length === 0 && <p style={s.info}>Nenhum voluntário cadastrado ainda.</p>}
               <div style={s.cards}>
                 {voluntarios.map(v => (
@@ -293,6 +633,14 @@ export default function Dashboard() {
                     <>
                       {editField('Nome Completo', 'nome_completo', formEdit, setField)}
                       {editField('Idade', 'idade', formEdit, setField, 'number')}
+                      <div>
+                        <label style={s.fieldLabel}>Sexo</label>
+                        <select style={s.inputEdit} value={formEdit.sexo || ''} onChange={e => setField('sexo', e.target.value)}>
+                          <option value="">Selecione</option>
+                          <option value="masculino">Masculino</option>
+                          <option value="feminino">Feminino</option>
+                        </select>
+                      </div>
                       {editField('WhatsApp', 'whatsapp', formEdit, setField)}
                       {editField('Instagram', 'instagram', formEdit, setField)}
                       {editField('Cidade / Estado / País', 'cidade_estado_pais', formEdit, setField)}
@@ -320,6 +668,7 @@ export default function Dashboard() {
                     <>
                       {formField('Nome Completo', selected.nome_completo)}
                       {formField('Idade', `${selected.idade} anos`)}
+                      {formField('Sexo', selected.sexo ? selected.sexo.charAt(0).toUpperCase() + selected.sexo.slice(1) : null)}
                       {formField('WhatsApp', selected.whatsapp)}
                       {formField('Instagram', selected.instagram)}
                       {formField('Cidade / Estado / País', selected.cidade_estado_pais)}
@@ -414,6 +763,88 @@ export default function Dashboard() {
             </div>
           )}
 
+          {menu === 'locais' && (
+            <>
+              <h2 style={s.pageTitle}>Locais</h2>
+              <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
+                <button
+                  title="Ver tabela"
+                  onClick={() => { setViewLocais(v => { if (v === 'mapa') { setBuscaLocal('') } return v === 'tabela' ? 'mapa' : 'tabela' }) }}
+                  style={{ flexShrink: 0, width: '40px', height: '40px', border: '1.5px solid #e5e7eb', borderRadius: '8px', background: viewLocais === 'tabela' ? '#F97310' : '#fff', color: viewLocais === 'tabela' ? '#fff' : '#6b7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}
+                >
+                  ⊞
+                </button>
+                <input
+                  style={{ ...s.inputEdit, flex: 1 }}
+                  placeholder="Pesquisar local..."
+                  value={buscaLocal}
+                  onChange={e => setBuscaLocal(e.target.value)}
+                />
+              </div>
+
+              {buscaLocal.length > 0 && buscaLocal !== localSelecionado?.nome && (
+                <div style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', marginBottom: '16px', overflow: 'hidden' }}>
+                  {locais.filter(l => l.nome.toLowerCase().includes(buscaLocal.toLowerCase()) || l.bairro?.toLowerCase().includes(buscaLocal.toLowerCase())).slice(0, 8).map(l => (
+                    <div key={l.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                    >
+                      <div style={{ cursor: 'pointer', flex: 1 }} onClick={() => { setLocalSelecionado(l); setBuscaLocal(l.nome) }}>
+                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117' }}>{l.nome}</div>
+                        <div style={{ fontSize: '12px', color: '#9ca3af' }}>{l.endereco} — {l.bairro} — {l.regiao}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+
+              {viewLocais === 'mapa' ? (
+                <div style={{ position: 'relative' }}>
+                  {localSelecionado?.endereco && (
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${localSelecionado.endereco}, ${localSelecionado.bairro}, Ibirité, MG`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ ...s.editBtn, textDecoration: 'none', position: 'absolute', top: '12px', right: '12px', zIndex: 1000, fontSize: '13px', background: '#F97310', color: '#fff' }}
+                    >
+                      Como chegar
+                    </a>
+                  )}
+                  <MapaLocal local={localSelecionado} />
+                </div>
+              ) : (
+                <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ background: '#f9fafb', borderBottom: '2px solid #F97310' }}>
+                        {['Tipo', 'Nome', 'Endereço', 'Bairro', 'Região'].map(h => (
+                          <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 800, color: '#0f1117', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(buscaLocal ? locais.filter(l => l.nome.toLowerCase().includes(buscaLocal.toLowerCase()) || l.bairro?.toLowerCase().includes(buscaLocal.toLowerCase())) : locais).map((l, i) => (
+                        <tr key={l.id} onClick={() => { setLocalSelecionado(l); setBuscaLocal(l.nome); setViewLocais('mapa') }} style={{ borderBottom: '1px solid #f3f4f6', background: i % 2 === 0 ? '#fff' : '#fafafa', cursor: 'pointer' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#fff4ec'}
+                          onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? '#fff' : '#fafafa'}
+                        >
+                          <td style={{ padding: '10px 16px', color: '#6b7280' }}>{l.tipo}</td>
+                          <td style={{ padding: '10px 16px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</td>
+                          <td style={{ padding: '10px 16px', color: '#6b7280' }}>{l.endereco || '—'}</td>
+                          <td style={{ padding: '10px 16px', color: '#6b7280' }}>{l.bairro}</td>
+                          <td style={{ padding: '10px 16px' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#F97310', background: '#fff4ec', borderRadius: '4px', padding: '2px 8px' }}>{l.regiao}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
           {menu === 'usuarios' && (
             <>
               <h2 style={s.pageTitle}>Usuários</h2>
@@ -438,6 +869,55 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Bottom nav mobile */}
+      <div className="dash-bottomnav" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, height: '64px', background: '#fff', borderTop: '1px solid #e5e7eb', zIndex: 200, alignItems: 'center', justifyContent: 'space-around' }}>
+        {[
+          { key: 'voluntarios', path: '/sistema/voluntario', label: 'Voluntários', icon: (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          )},
+          { key: 'usuarios', path: '/sistema/usuarios', label: 'Usuários', icon: (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>
+            </svg>
+          )},
+          { key: 'locais', path: '/sistema/locais', label: 'Locais', icon: (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
+            </svg>
+          )},
+          { key: 'dashboard', path: '/sistema/dashboard', label: 'Dashboard', icon: (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+            </svg>
+          )},
+        ].map(item => {
+          const ativo = menu === item.key
+          return (
+            <button key={item.key} onClick={() => navigate(item.path)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', cursor: 'pointer', color: ativo ? '#F97310' : '#9ca3af', padding: '6px 12px', fontFamily: 'inherit' }}>
+              {item.icon}
+              <span style={{ fontSize: '10px', fontWeight: 700 }}>{item.label}</span>
+            </button>
+          )
+        })}
+        {/* Perfil */}
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setDropdownOpen(o => !o)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 12px', fontFamily: 'inherit' }}>
+            <div style={{ ...s.profileAvatar, width: '28px', height: '28px', fontSize: '11px' }}>{getInitials(nomeUsuario || user?.email)}</div>
+            <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af' }}>Perfil</span>
+          </button>
+          {dropdownOpen && (
+            <div style={{ ...s.dropdown, bottom: '64px', top: 'auto', right: 0 }}>
+              <button style={s.dropdownItem} onClick={() => setDropdownOpen(false)}>Editar usuário</button>
+              <div style={s.dropdownDivider} />
+              <button style={{ ...s.dropdownItem, color: '#ef4444' }} onClick={handleSignOut}>Sair</button>
+            </div>
+          )}
+        </div>
+      </div>
 
     </div>
   )
@@ -496,9 +976,12 @@ function row(label, value) {
 
 const s = {
   page: {
-    minHeight: '100vh',
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
     background: '#f9fafb',
     fontFamily: "'Nunito', sans-serif",
+    overflow: 'hidden',
   },
   header: {
     background: '#0f1117',
@@ -595,7 +1078,9 @@ const s = {
   },
   body: {
     display: 'flex',
-    minHeight: 'calc(100vh - 64px)',
+    flex: 1,
+    overflow: 'hidden',
+    minHeight: 0,
   },
   sidebar: {
     width: '220px',
@@ -603,6 +1088,7 @@ const s = {
     borderRight: '1px solid #e5e7eb',
     padding: '28px 16px',
     flexShrink: 0,
+    overflowY: 'auto',
   },
   sidebarLabel: {
     fontSize: '11px',
@@ -633,8 +1119,12 @@ const s = {
   },
   main: {
     flex: 1,
-    padding: '32px',
+    paddingTop: '32px',
+    paddingLeft: '32px',
+    paddingRight: '32px',
+    paddingBottom: '0',
     overflowY: 'auto',
+    minHeight: 0,
   },
   pageTitle: {
     fontSize: '22px',
