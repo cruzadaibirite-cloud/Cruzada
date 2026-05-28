@@ -14,22 +14,10 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/cadastro-voluntario" element={<CadastroVoluntario />} />
         <Route path="/sistema" element={<ProtectedRoute><Navigate to="/sistema/voluntario" replace /></ProtectedRoute>} />
-        <Route
-          path="/sistema/voluntario"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/sistema/usuarios"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/sistema/voluntario" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/sistema/usuarios" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/sistema/locais" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/sistema/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   )
