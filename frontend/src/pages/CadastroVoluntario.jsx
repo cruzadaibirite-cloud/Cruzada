@@ -58,6 +58,7 @@ export default function CadastroVoluntario() {
     faz_filmagens: false,
     outras_competencias: false,
     outra_competencia_descricao: '',
+    sexo: '',
   })
 
   function set(key, value) {
@@ -120,6 +121,7 @@ export default function CadastroVoluntario() {
       faz_filmagens: form.faz_filmagens,
       outras_competencias: form.outras_competencias,
       outra_competencia_descricao: form.outra_competencia_descricao || null,
+      sexo: form.sexo || null,
     }
 
     const { error: err } = await supabase.from('voluntarios').insert([payload])
@@ -188,8 +190,17 @@ export default function CadastroVoluntario() {
           <div style={s.section}>
             <h2 style={s.sectionTitle}>Dados Pessoais</h2>
             <div style={s.grid} className="cad-grid">
-              {field('Nome Completo', <input style={s.input} required value={form.nome_completo} onChange={e => set('nome_completo', e.target.value)} placeholder="Seu nome completo" />)}
-              {field('Idade', <input style={s.input} required type="number" min="16" max="99" value={form.idade} onChange={e => set('idade', e.target.value)} placeholder="Sua idade" />)}
+              {field('Nome Completo', <input style={s.input} required value={form.nome_completo} onChange={e => set('nome_completo', e.target.value)} placeholder="Seu nome completo" />, true)}
+              <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                {field('Idade', <input style={s.input} required type="number" min="16" max="99" value={form.idade} onChange={e => set('idade', e.target.value)} placeholder="Sua idade" />)}
+                {field('Sexo', (
+                  <select style={s.input} required value={form.sexo} onChange={e => set('sexo', e.target.value)}>
+                    <option value="">Selecione</option>
+                    <option value="masculino">Masculino</option>
+                    <option value="feminino">Feminino</option>
+                  </select>
+                ))}
+              </div>
               {field('WhatsApp com DDD', <input style={s.input} required value={form.whatsapp} onChange={e => set('whatsapp', e.target.value)} placeholder="(31) 99999-9999" />)}
               {field('Instagram', <input style={s.input} required value={form.instagram} onChange={e => set('instagram', e.target.value)} placeholder="@seuinstagram" onFocus={() => { if (!instaConfirmed.current) setShowInstaModal(true) }} />)}
               {field('Cidade, Estado, País', (
@@ -225,26 +236,20 @@ export default function CadastroVoluntario() {
               {field('Como você serve na sua igreja local?', <textarea style={s.textarea} required value={form.como_serve_igreja} onChange={e => set('como_serve_igreja', e.target.value)} placeholder="Descreva como você serve" />, true)}
               {field('Há quanto tempo está na sua igreja local?', <input style={s.input} required value={form.tempo_na_igreja} onChange={e => set('tempo_na_igreja', e.target.value)} placeholder="Ex: 3 anos" />, true)}
               {field('Estado Civil', (
-                <div style={s.radioGroup}>
-                  {['casado', 'solteiro'].map(op => (
-                    <label key={op} style={s.radioLabel}>
-                      <input type="radio" name="estado_civil" value={op} required checked={form.estado_civil === op} onChange={e => set('estado_civil', e.target.value)} style={s.radio} />
-                      {op.charAt(0).toUpperCase() + op.slice(1)}
-                    </label>
-                  ))}
-                </div>
+                <select style={s.input} required value={form.estado_civil} onChange={e => set('estado_civil', e.target.value)}>
+                  <option value="">Selecione</option>
+                  <option value="solteiro">Solteiro</option>
+                  <option value="casado">Casado</option>
+                </select>
               ))}
               {form.estado_civil === 'casado' && (
                 <>
                   {field('Seu cônjuge irá na missão?', (
-                    <div style={s.radioGroup}>
-                      {['sim', 'nao'].map(op => (
-                        <label key={op} style={s.radioLabel}>
-                          <input type="radio" name="conjuge_na_missao" value={op} required checked={form.conjuge_na_missao === op} onChange={e => set('conjuge_na_missao', e.target.value)} style={s.radio} />
-                          {op === 'sim' ? 'Sim' : 'Não'}
-                        </label>
-                      ))}
-                    </div>
+                    <select style={s.input} required value={form.conjuge_na_missao} onChange={e => set('conjuge_na_missao', e.target.value)}>
+                      <option value="">Selecione</option>
+                      <option value="sim">Sim</option>
+                      <option value="nao">Não</option>
+                    </select>
                   ))}
                   {form.conjuge_na_missao === 'nao' && field('Se não, por quê?', <textarea style={s.textarea} required value={form.motivo_conjuge_ausente} onChange={e => set('motivo_conjuge_ausente', e.target.value)} placeholder="Explique o motivo" />, true)}
                 </>
@@ -260,14 +265,11 @@ export default function CadastroVoluntario() {
               {field('Contato de Emergência', <input style={s.input} required value={form.telefone_emergencia} onChange={e => set('telefone_emergencia', e.target.value)} placeholder="(31) 99999-9999" />)}
               {field('Você tem alguma limitação física ou precisa de algum remédio especial?', <textarea style={s.textarea} value={form.limitacao_fisica} onChange={e => set('limitacao_fisica', e.target.value)} placeholder="Se sim, descreva. Se não, deixe em branco." />, true)}
               {field('Já participou de alguma viagem missionária?', (
-                <div style={s.radioGroup}>
-                  {['sim', 'nao'].map(op => (
-                    <label key={op} style={s.radioLabel}>
-                      <input type="radio" name="ja_participou_missao" value={op} required checked={form.ja_participou_missao === op} onChange={e => set('ja_participou_missao', e.target.value)} style={s.radio} />
-                      {op === 'sim' ? 'Sim' : 'Não'}
-                    </label>
-                  ))}
-                </div>
+                <select style={s.input} required value={form.ja_participou_missao} onChange={e => set('ja_participou_missao', e.target.value)}>
+                  <option value="">Selecione</option>
+                  <option value="sim">Sim</option>
+                  <option value="nao">Não</option>
+                </select>
               ), true)}
             </div>
           </div>
