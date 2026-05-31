@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import MapaLocal from '../components/MapaLocal'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -8,6 +8,7 @@ const MENU = [
   { key: 'voluntarios', label: 'Voluntários', path: '/sistema/voluntario' },
   { key: 'usuarios', label: 'Usuários', path: '/sistema/usuarios' },
   { key: 'locais', label: 'Locais', path: '/sistema/locais' },
+  { key: 'agenda', label: 'Agenda', path: '/sistema/agenda' },
   { key: 'dashboard', label: 'Dashboard', path: '/sistema/dashboard' },
 ]
 
@@ -49,7 +50,7 @@ export default function Dashboard() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
+  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
   const [voluntarios, setVoluntarios] = useState([])
   const [loadingVol, setLoadingVol] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -70,6 +71,22 @@ export default function Dashboard() {
   const [tooltip, setTooltip] = useState(null)
   const [filtro, setFiltro] = useState(null)
   const tooltipTimer = useRef(null)
+  const [modalNovoUsuario, setModalNovoUsuario] = useState(false)
+  const [formNovoUsuario, setFormNovoUsuario] = useState({ nome: '', email: '', senha: '', telefone: '', perfil: 'voluntario' })
+  const [salvandoUsuario, setSalvandoUsuario] = useState(false)
+  const [erroUsuario, setErroUsuario] = useState('')
+
+  // Agenda
+  const hoje = new Date()
+  const [agendaView, setAgendaView] = useState('mes') // dia | semana | mes | agenda
+  const [agendaData, setAgendaData] = useState(new Date(hoje.getFullYear(), hoje.getMonth(), 1))
+  const [agendaEventos, setAgendaEventos] = useState([])
+  const [modalEvento, setModalEvento] = useState(null) // { tipo: 'novo', dia } | { tipo: 'ver', evento } | { tipo: 'editar', evento }
+  const [formEditEvento, setFormEditEvento] = useState({})
+  const [buscaLocalEvento, setBuscaLocalEvento] = useState('')
+  const [confirmarExclusao, setConfirmarExclusao] = useState(false)
+  const [formEvento, setFormEvento] = useState({ titulo: '', data: '', horaInicio: '', horaFim: '', cor: '#F97310', descricao: '', local: '', equipe: '' })
+  const [agendaDiaSelecionado, setAgendaDiaSelecionado] = useState(null)
 
   useEffect(() => {
     async function carregarNome() {
@@ -88,8 +105,27 @@ export default function Dashboard() {
   useEffect(() => {
     if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
     if (menu === 'usuarios') carregarUsuarios()
-    if (menu === 'locais') carregarLocais()
+    if (menu === 'locais' || menu === 'agenda') carregarLocais()
+    if (menu === 'agenda') carregarEventos()
   }, [menu])
+
+  async function carregarEventos() {
+    const { data } = await supabase.from('eventos').select('*').order('data').order('hora_inicio')
+    if (data) {
+      setAgendaEventos(data.map(e => ({
+        id: e.id,
+        titulo: e.titulo,
+        data: new Date(e.data + 'T00:00:00'),
+        horaInicio: e.hora_inicio?.slice(0, 5),
+        horaFim: e.hora_fim?.slice(0, 5),
+        hora: e.hora_inicio?.slice(0, 5),
+        cor: e.cor || '#F97310',
+        descricao: e.descricao || '',
+        local: e.local || '',
+        equipe: e.equipe || '',
+      })))
+    }
+  }
 
   async function carregarLocais() {
     const { data } = await supabase.from('locais').select('*').order('nome')
@@ -171,6 +207,25 @@ export default function Dashboard() {
     }
   }
 
+  async function criarUsuario() {
+    setSalvandoUsuario(true)
+    setErroUsuario('')
+    const { nome, email, senha, telefone, perfil } = formNovoUsuario
+    const { data, error } = await supabase.auth.signUp({ email, password: senha })
+    if (error) { setErroUsuario(error.message); setSalvandoUsuario(false); return }
+    const uid = data.user?.id
+    if (uid) {
+      const { error: insertError } = await supabase.from('usuarios').insert({ id: uid, nome, email, telefone: telefone || null, perfil, ativo: true })
+      if (insertError) console.error('Erro insert usuarios:', insertError)
+    } else {
+      console.error('uid nulo, data:', data)
+    }
+    setSalvandoUsuario(false)
+    setModalNovoUsuario(false)
+    setFormNovoUsuario({ nome: '', email: '', senha: '', telefone: '', perfil: 'voluntario' })
+    carregarUsuarios()
+  }
+
   async function alterarStatus(status) {
     await supabase.from('voluntarios').update({ status }).eq('id', selected.id)
     setSelected(v => ({ ...v, status }))
@@ -186,7 +241,7 @@ export default function Dashboard() {
         <div style={s.modalOverlay} onClick={() => setAlertaCampos(null)}>
           <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>⚠</div>
+              <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', flexShrink: 0 }}>⚠</div>
               <div>
                 <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117', margin: 0 }}>Cadastro incompleto</h3>
                 <p style={{ fontSize: '13px', color: '#6b7280', margin: 0, marginTop: '2px' }}>{alertaCampos.nome}</p>
@@ -195,9 +250,9 @@ export default function Dashboard() {
             <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '12px' }}>Os seguintes campos obrigatórios estão pendentes:</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '24px' }}>
               {alertaCampos.campos.map(c => (
-                <div key={c} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                  <span style={{ color: '#ef4444', fontSize: '12px' }}>●</span>
-                  <span style={{ fontSize: '14px', color: '#dc2626', fontWeight: 600 }}>{c}</span>
+                <div key={c} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#f3f4f6', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                  <span style={{ color: '#0f1117', fontSize: '12px' }}>●</span>
+                  <span style={{ fontSize: '14px', color: '#0f1117', fontWeight: 600 }}>{c}</span>
                 </div>
               ))}
             </div>
@@ -279,7 +334,7 @@ export default function Dashboard() {
             <div style={s.dropdown}>
               <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false) }}>Editar usuário</button>
               <div style={s.dropdownDivider} />
-              <button style={{ ...s.dropdownItem, color: '#ef4444' }} onClick={handleSignOut}>Sair</button>
+              <button style={{ ...s.dropdownItem, color: '#0f1117' }} onClick={handleSignOut}>Sair</button>
             </div>
           )}
         </div>
@@ -387,9 +442,9 @@ export default function Dashboard() {
                 <div className="dash-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
                   {[
                     { label: 'Total', value: total, color: '#0f1117', bg: '#fff', border: '#e5e7eb', lista: voluntarios },
-                    { label: 'Aprovados', value: aprovados, color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', lista: voluntarios.filter(v => v.status === 'aprovado') },
+                    { label: 'Aprovados', value: aprovados, color: '#F97310', bg: '#fff4ec', border: '#fed7aa', lista: voluntarios.filter(v => v.status === 'aprovado') },
                     { label: 'Pendentes', value: pendentes, color: '#F97310', bg: '#fff4ec', border: '#fed7aa', lista: voluntarios.filter(v => !v.status || v.status === 'pendente') },
-                    { label: 'Reprovados', value: reprovados, color: '#dc2626', bg: '#fef2f2', border: '#fecaca', lista: voluntarios.filter(v => v.status === 'reprovado') },
+                    { label: 'Reprovados', value: reprovados, color: '#0f1117', bg: '#f3f4f6', border: '#e5e7eb', lista: voluntarios.filter(v => v.status === 'reprovado') },
                   ].map(k => (
                     <div key={k.label}
                       onMouseEnter={e => hover(e, k.label, k.lista)}
@@ -414,7 +469,7 @@ export default function Dashboard() {
                         onMouseEnter={e => hover(e, 'Masculino', base.filter(v => v.sexo === 'Masculino'))}
                         onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
                         onClick={() => clique('Masculino', voluntarios.filter(v => v.sexo === 'Masculino'))}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#3b82f6' }}>{masculino}</div>
+                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f1117' }}>{masculino}</div>
                         <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Masculino</div>
                       </div>
                       <div style={{ width: '1px', background: '#f3f4f6' }} />
@@ -422,17 +477,17 @@ export default function Dashboard() {
                         onMouseEnter={e => hover(e, 'Feminino', base.filter(v => v.sexo === 'Feminino'))}
                         onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
                         onClick={() => clique('Feminino', voluntarios.filter(v => v.sexo === 'Feminino'))}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#ec4899' }}>{feminino}</div>
+                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#F97310' }}>{feminino}</div>
                         <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Feminino</div>
                       </div>
                     </div>
                     <div style={{ height: '10px', borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden', display: 'flex' }}>
-                      <div style={{ width: `${pct(masculino, total)}%`, background: '#3b82f6', transition: 'width 0.5s' }} />
-                      <div style={{ width: `${pct(feminino, total)}%`, background: '#ec4899', transition: 'width 0.5s' }} />
+                      <div style={{ width: `${pct(masculino, total)}%`, background: '#0f1117', transition: 'width 0.5s' }} />
+                      <div style={{ width: `${pct(feminino, total)}%`, background: '#F97310', transition: 'width 0.5s' }} />
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                      <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 700 }}>{pct(masculino, total)}%</span>
-                      <span style={{ fontSize: '11px', color: '#ec4899', fontWeight: 700 }}>{pct(feminino, total)}%</span>
+                      <span style={{ fontSize: '11px', color: '#0f1117', fontWeight: 700 }}>{pct(masculino, total)}%</span>
+                      <span style={{ fontSize: '11px', color: '#F97310', fontWeight: 700 }}>{pct(feminino, total)}%</span>
                     </div>
                   </div>
 
@@ -466,10 +521,10 @@ export default function Dashboard() {
                   <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Perfil geral</div>
                     {[
-                      { label: 'Solteiros', value: solteiros, color: '#8b5cf6', lista: voluntarios.filter(v => v.estado_civil === 'solteiro') },
+                      { label: 'Solteiros', value: solteiros, color: '#F97310', lista: voluntarios.filter(v => v.estado_civil === 'solteiro') },
                       { label: 'Casados', value: casados, color: '#F97310', lista: voluntarios.filter(v => v.estado_civil === 'casado') },
-                      { label: 'Fora de MG', value: foraMG, color: '#3b82f6', lista: voluntarios.filter(v => v.cidade_estado_pais && !v.cidade_estado_pais.includes('Minas Gerais')) },
-                      { label: 'Incompletos', value: incompletos, color: '#ef4444', lista: voluntarios.filter(v => camposFaltando(v).length > 0) },
+                      { label: 'Fora de MG', value: foraMG, color: '#0f1117', lista: voluntarios.filter(v => v.cidade_estado_pais && !v.cidade_estado_pais.includes('Minas Gerais')) },
+                      { label: 'Incompletos', value: incompletos, color: '#0f1117', lista: voluntarios.filter(v => camposFaltando(v).length > 0) },
                     ].map(item => (
                       <div key={item.label}
                         onMouseEnter={e => hover(e, item.label, base.filter(v => item.lista.find(x => x.id === v.id)))}
@@ -531,10 +586,10 @@ export default function Dashboard() {
                           style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: '8px', ...itemStyle(c.label) }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{c.label}</span>
-                            <span style={{ fontSize: '13px', fontWeight: 800, color: '#8b5cf6' }}>{c.count}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 800, color: '#F97310' }}>{c.count}</span>
                           </div>
                           <div style={{ height: `${barComp}px`, borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden' }}>
-                            <div style={{ width: `${pct(c.count, maxComp)}%`, height: '100%', background: '#8b5cf6' }} />
+                            <div style={{ width: `${pct(c.count, maxComp)}%`, height: '100%', background: '#F97310' }} />
                           </div>
                         </div>
                       })}
@@ -614,7 +669,7 @@ export default function Dashboard() {
                   <h3 style={{ ...s.formSectionTitle, margin: 0, padding: 0, border: 'none' }}>Dados Pessoais</h3>
                   <div style={{ position: 'relative' }}>
                     <span
-                      style={{ ...s.modalStatus, cursor: 'pointer', background: selected.status === 'aprovado' ? '#dcfce7' : selected.status === 'reprovado' ? '#fee2e2' : '#fff4ec', color: selected.status === 'aprovado' ? '#16a34a' : selected.status === 'reprovado' ? '#dc2626' : '#F97310' }}
+                      style={{ ...s.modalStatus, cursor: 'pointer', background: selected.status === 'aprovado' ? '#dcfce7' : selected.status === 'reprovado' ? '#f3f4f6' : '#fff4ec', color: selected.status === 'aprovado' ? '#F97310' : selected.status === 'reprovado' ? '#0f1117' : '#F97310' }}
                       onClick={() => setEditandoStatus(e => !e)}
                     >
                       {selected.status || 'pendente'} ▾
@@ -765,6 +820,600 @@ export default function Dashboard() {
             </div>
           )}
 
+          {menu === 'agenda' && (() => {
+            const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+            const DIAS_SEMANA = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+            const ano = agendaData.getFullYear()
+            const mes = agendaData.getMonth()
+
+            function eventosNoDia(d) {
+              return agendaEventos.filter(e => {
+                const ed = e.data
+                return ed.getFullYear() === d.getFullYear() && ed.getMonth() === d.getMonth() && ed.getDate() === d.getDate()
+              }).sort((a, b) => a.hora.localeCompare(b.hora))
+            }
+
+            function navAnterior() {
+              if (agendaView === 'mes') setAgendaData(new Date(ano, mes - 1, 1))
+              else if (agendaView === 'semana') setAgendaData(d => { const n = new Date(d); n.setDate(n.getDate() - 7); return n })
+              else if (agendaView === 'dia') setAgendaData(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n })
+              else setAgendaData(new Date(ano, mes - 1, 1))
+            }
+            function navProximo() {
+              if (agendaView === 'mes') setAgendaData(new Date(ano, mes + 1, 1))
+              else if (agendaView === 'semana') setAgendaData(d => { const n = new Date(d); n.setDate(n.getDate() + 7); return n })
+              else if (agendaView === 'dia') setAgendaData(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n })
+              else setAgendaData(new Date(ano, mes + 1, 1))
+            }
+            function irHoje() { setAgendaData(new Date(hoje.getFullYear(), hoje.getMonth(), 1)) }
+
+            function tituloNav() {
+              if (agendaView === 'mes' || agendaView === 'agenda') return `${MESES[mes]} ${ano}`
+              if (agendaView === 'semana') {
+                const ini = new Date(agendaData); ini.setDate(ini.getDate() - ini.getDay())
+                const fim = new Date(ini); fim.setDate(fim.getDate() + 6)
+                return `${ini.getDate()} – ${fim.getDate()} de ${MESES[ini.getMonth()]} ${ano}`
+              }
+              if (agendaView === 'dia') return `${agendaData.getDate()} de ${MESES[agendaData.getMonth()]} ${agendaData.getFullYear()}`
+            }
+
+            function toInputDate(d) {
+              return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+            }
+            function abrirNovoEvento(dia) {
+              if (locais.length === 0) carregarLocais()
+              setFormEvento({ titulo: '', data: toInputDate(dia), horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', equipe: '' })
+              setModalEvento({ tipo: 'novo', dia })
+            }
+            async function salvarEvento() {
+              if (!formEvento.titulo.trim() || !formEvento.data) return
+              const payload = {
+                titulo: formEvento.titulo,
+                data: formEvento.data,
+                hora_inicio: formEvento.horaInicio,
+                hora_fim: formEvento.horaFim,
+                cor: formEvento.cor,
+                descricao: formEvento.descricao || null,
+                local: formEvento.local || null,
+                equipe: formEvento.equipe || null,
+              }
+              const { data, error } = await supabase.from('eventos').insert(payload).select().single()
+              if (!error && data) {
+                const novo = { id: data.id, titulo: data.titulo, data: new Date(data.data + 'T00:00:00'), horaInicio: data.hora_inicio?.slice(0,5), horaFim: data.hora_fim?.slice(0,5), hora: data.hora_inicio?.slice(0,5), cor: data.cor, descricao: data.descricao || '', local: data.local || '', equipe: data.equipe || '' }
+                setAgendaEventos(ev => [...ev, novo])
+              }
+              setModalEvento(null)
+            }
+            async function excluirEvento(id) {
+              await supabase.from('eventos').delete().eq('id', id)
+              setAgendaEventos(ev => ev.filter(e => e.id !== id))
+              setModalEvento(null)
+            }
+
+            // --- Vista Mês ---
+            function renderMes() {
+              const primeiroDia = new Date(ano, mes, 1).getDay()
+              const diasNoMes = new Date(ano, mes + 1, 0).getDate()
+              const diasAntes = primeiroDia
+              const totalCelulas = Math.ceil((diasAntes + diasNoMes) / 7) * 7
+              const celulas = []
+              for (let i = 0; i < totalCelulas; i++) {
+                const diaNum = i - diasAntes + 1
+                const valido = diaNum >= 1 && diaNum <= diasNoMes
+                const diaObj = valido ? new Date(ano, mes, diaNum) : null
+                const ehHoje = diaObj && diaObj.toDateString() === hoje.toDateString()
+                const eventos = diaObj ? eventosNoDia(diaObj) : []
+                celulas.push({ diaNum, valido, diaObj, ehHoje, eventos })
+              }
+              return (
+                <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  {/* Cabeçalho dias da semana */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid #e5e7eb' }}>
+                    {DIAS_SEMANA.map(d => (
+                      <div key={d} style={{ padding: '10px 0', textAlign: 'center', fontSize: '12px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{d}</div>
+                    ))}
+                  </div>
+                  {/* Grade */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
+                    {celulas.map((c, i) => (
+                      <div key={i}
+                        onClick={() => c.valido && abrirNovoEvento(c.diaObj)}
+                        style={{ minHeight: '100px', borderRight: (i + 1) % 7 === 0 ? 'none' : '1px solid #f3f4f6', borderBottom: i < celulas.length - 7 ? '1px solid #f3f4f6' : 'none', padding: '8px', background: c.valido ? '#fff' : '#fafafa', cursor: c.valido ? 'pointer' : 'default', position: 'relative' }}
+                        onMouseEnter={e => c.valido && (e.currentTarget.style.background = '#fafffe')}
+                        onMouseLeave={e => c.valido && (e.currentTarget.style.background = '#fff')}
+                      >
+                        {c.valido && (
+                          <>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: c.ehHoje ? '#F97310' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: c.ehHoje ? 900 : 600, color: c.ehHoje ? '#fff' : '#374151' }}>{c.diaNum}</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              {c.eventos.slice(0, 3).map(ev => (
+                                <div key={ev.id}
+                                  onClick={e => { e.stopPropagation(); setModalEvento({ tipo: 'ver', evento: ev }) }}
+                                  style={{ fontSize: '11px', fontWeight: 700, color: '#fff', background: ev.cor, borderRadius: '4px', padding: '2px 6px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'pointer' }}
+                                >
+                                  {ev.horaInicio || ev.hora}–{ev.horaFim || ''} {ev.titulo}
+                                </div>
+                              ))}
+                              {c.eventos.length > 3 && <div style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 700 }}>+{c.eventos.length - 3} mais</div>}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            }
+
+            // helpers de tempo
+            function horaParaMinutos(h) {
+              if (!h) return 0
+              const [hh, mm] = h.split(':').map(Number)
+              return hh * 60 + (mm || 0)
+            }
+            const HORA_H = 60 // px por hora
+
+            // Calcula colunas para eventos sobrepostos
+            function calcularColunas(evs) {
+              const sorted = [...evs].sort((a, b) => horaParaMinutos(a.horaInicio || a.hora) - horaParaMinutos(b.horaInicio || b.hora))
+              const cols = [] // cada posição guarda o fim do último evento naquela coluna
+              const resultado = sorted.map(ev => {
+                const ini = horaParaMinutos(ev.horaInicio || ev.hora)
+                const fim = horaParaMinutos(ev.horaFim) || ini + 60
+                let col = cols.findIndex(fimCol => fimCol <= ini)
+                if (col === -1) { col = cols.length; cols.push(fim) } else { cols[col] = fim }
+                return { ev, col }
+              })
+              const totalCols = cols.length
+              return resultado.map(r => ({ ...r, totalCols }))
+            }
+
+            // --- Vista Semana ---
+            function renderSemana() {
+              const inicioSemana = new Date(agendaData)
+              inicioSemana.setDate(inicioSemana.getDate() - inicioSemana.getDay())
+              const dias = Array.from({ length: 7 }, (_, i) => { const d = new Date(inicioSemana); d.setDate(d.getDate() + i); return d })
+              const horas = Array.from({ length: 24 }, (_, i) => i)
+              const totalH = 24 * HORA_H
+              return (
+                <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  {/* Cabeçalho */}
+                  <div style={{ display: 'flex', borderBottom: '2px solid #e5e7eb' }}>
+                    <div style={{ width: '56px', flexShrink: 0 }} />
+                    {dias.map((d, i) => {
+                      const ehHoje = d.toDateString() === hoje.toDateString()
+                      return (
+                        <div key={i} style={{ flex: 1, padding: '12px 4px', textAlign: 'center', borderLeft: '1px solid #f3f4f6' }}>
+                          <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>{DIAS_SEMANA[d.getDay()]}</div>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: ehHoje ? '#F97310' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '4px auto 0' }}>
+                            <span style={{ fontSize: '16px', fontWeight: 900, color: ehHoje ? '#fff' : '#374151' }}>{d.getDate()}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {/* Corpo */}
+                  <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 280px)' }}>
+                    <div style={{ display: 'flex' }}>
+                      {/* Coluna de horas */}
+                      <div style={{ width: '56px', flexShrink: 0 }}>
+                        {horas.map(h => (
+                          <div key={h} style={{ height: `${HORA_H}px`, borderBottom: '1px solid #f3f4f6', padding: '4px 8px 0', fontSize: '11px', color: '#9ca3af', fontWeight: 600, textAlign: 'right', boxSizing: 'border-box' }}>
+                            {h === 0 ? '' : `${String(h).padStart(2,'0')}:00`}
+                          </div>
+                        ))}
+                      </div>
+                      {/* Colunas dos dias */}
+                      {dias.map((d, di) => {
+                        const evsDia = agendaEventos.filter(e => {
+                          const ed = e.data
+                          return ed.getFullYear() === d.getFullYear() && ed.getMonth() === d.getMonth() && ed.getDate() === d.getDate()
+                        })
+                        return (
+                          <div key={di} style={{ flex: 1, borderLeft: '1px solid #f3f4f6', position: 'relative', height: `${totalH}px` }}
+                            onClick={() => abrirNovoEvento(new Date(d.getFullYear(), d.getMonth(), d.getDate()))}>
+                            {/* Linhas de hora */}
+                            {horas.map(h => (
+                              <div key={h} style={{ position: 'absolute', top: `${h * HORA_H}px`, left: 0, right: 0, height: `${HORA_H}px`, borderBottom: '1px solid #f3f4f6' }} />
+                            ))}
+                            {/* Eventos */}
+                            {calcularColunas(evsDia).map(({ ev, col, totalCols }) => {
+                              const ini = horaParaMinutos(ev.horaInicio || ev.hora)
+                              const fim = horaParaMinutos(ev.horaFim) || ini + 60
+                              const top = (ini / 60) * HORA_H
+                              const height = Math.max(((fim - ini) / 60) * HORA_H, 20)
+                              const w = `calc((100% - 4px) / ${totalCols})`
+                              const left = `calc(2px + ${col} * ((100% - 4px) / ${totalCols}))`
+                              const bgClaro = ev.cor === '#0f1117' ? '#f3f4f6' : ev.cor === '#ffffff' ? '#f9fafb' : '#fff4ec'
+                              return (
+                                <div key={ev.id}
+                                  onClick={e => { e.stopPropagation(); setModalEvento({ tipo: 'ver', evento: ev }) }}
+                                  style={{ position: 'absolute', top: `${top}px`, left, width: w, height: `${height}px`, background: bgClaro, borderRadius: '6px', overflow: 'hidden', zIndex: 2, boxSizing: 'border-box', display: 'flex', cursor: 'pointer' }}>
+                                  <div style={{ width: '4px', background: ev.cor, flexShrink: 0 }} />
+                                  <div style={{ flex: 1, padding: '3px 5px', overflow: 'hidden' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 800, color: '#0f1117', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.horaInicio}–{ev.horaFim}</div>
+                                    <div style={{ fontSize: '10px', fontWeight: 700, color: '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.titulo}</div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            // --- Vista Dia ---
+            function renderDia() {
+              const horas = Array.from({ length: 24 }, (_, i) => i)
+              const ehHoje = agendaData.toDateString() === hoje.toDateString()
+              const evsDia = agendaEventos.filter(e => {
+                const ed = e.data
+                return ed.getFullYear() === agendaData.getFullYear() && ed.getMonth() === agendaData.getMonth() && ed.getDate() === agendaData.getDate()
+              })
+              const totalH = 24 * HORA_H
+              return (
+                <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  {/* Cabeçalho */}
+                  <div style={{ padding: '16px 24px', borderBottom: '2px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: ehHoje ? '#F97310' : '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '18px', fontWeight: 900, color: ehHoje ? '#fff' : '#374151' }}>{agendaData.getDate()}</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f1117' }}>{DIAS_SEMANA[agendaData.getDay()]}</div>
+                      <div style={{ fontSize: '12px', color: '#9ca3af' }}>{MESES[agendaData.getMonth()]} {agendaData.getFullYear()}</div>
+                    </div>
+                  </div>
+                  {/* Corpo */}
+                  <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+                    <div style={{ display: 'flex' }}>
+                      {/* Coluna horas */}
+                      <div style={{ width: '64px', flexShrink: 0 }}>
+                        {horas.map(h => (
+                          <div key={h} style={{ height: `${HORA_H}px`, padding: '4px 12px 0', fontSize: '12px', color: '#9ca3af', fontWeight: 600, textAlign: 'right', boxSizing: 'border-box', borderBottom: '1px solid #f3f4f6' }}>
+                            {h === 0 ? '' : `${String(h).padStart(2,'0')}:00`}
+                          </div>
+                        ))}
+                      </div>
+                      {/* Coluna do dia */}
+                      <div style={{ flex: 1, borderLeft: '1px solid #f3f4f6', position: 'relative', height: `${totalH}px`, cursor: 'pointer' }}
+                        onClick={() => abrirNovoEvento(new Date(agendaData.getFullYear(), agendaData.getMonth(), agendaData.getDate()))}>
+                        {horas.map(h => (
+                          <div key={h} style={{ position: 'absolute', top: `${h * HORA_H}px`, left: 0, right: 0, height: `${HORA_H}px`, borderBottom: '1px solid #f3f4f6' }} />
+                        ))}
+                        {calcularColunas(evsDia).map(({ ev, col, totalCols }) => {
+                          const ini = horaParaMinutos(ev.horaInicio || ev.hora)
+                          const fim = horaParaMinutos(ev.horaFim) || ini + 60
+                          const top = (ini / 60) * HORA_H
+                          const height = Math.max(((fim - ini) / 60) * HORA_H, 24)
+                          const w = `calc((100% - 12px) / ${totalCols})`
+                          const left = `calc(4px + ${col} * ((100% - 12px) / ${totalCols}))`
+                          const bgClaro = ev.cor === '#0f1117' ? '#f3f4f6' : ev.cor === '#ffffff' ? '#f9fafb' : '#fff4ec'
+                          return (
+                            <div key={ev.id}
+                              onClick={e => { e.stopPropagation(); setModalEvento({ tipo: 'ver', evento: ev }) }}
+                              style={{ position: 'absolute', top: `${top}px`, left, width: w, height: `${height}px`, background: bgClaro, borderRadius: '8px', overflow: 'hidden', zIndex: 2, boxSizing: 'border-box', display: 'flex', cursor: 'pointer' }}>
+                              <div style={{ width: '5px', background: ev.cor, flexShrink: 0 }} />
+                              <div style={{ flex: 1, padding: '6px 10px', overflow: 'hidden' }}>
+                                <div style={{ fontSize: '12px', fontWeight: 800, color: '#0f1117' }}>{ev.horaInicio}–{ev.horaFim}</div>
+                                <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{ev.titulo}</div>
+                                {ev.local && height > 50 && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>📍 {ev.local}</div>}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            }
+
+            // --- Vista Agenda (lista) ---
+            function renderAgenda() {
+              const proximos = agendaEventos
+                .filter(e => e.data >= new Date(ano, mes, 1))
+                .sort((a, b) => a.data - b.data || a.hora.localeCompare(b.hora))
+              if (proximos.length === 0) return (
+                <div style={{ background: '#fff', borderRadius: '12px', padding: '48px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>📅</div>
+                  <p style={{ fontSize: '15px', fontWeight: 700, color: '#374151', marginBottom: '4px' }}>Nenhum evento agendado</p>
+                  <p style={{ fontSize: '13px', color: '#9ca3af' }}>Clique em um dia para adicionar um evento.</p>
+                </div>
+              )
+              let ultimoMes = null
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {proximos.map(ev => {
+                    const evMes = `${MESES[ev.data.getMonth()]} ${ev.data.getFullYear()}`
+                    const mostrarMes = evMes !== ultimoMes
+                    ultimoMes = evMes
+                    return (
+                      <div key={ev.id}>
+                        {mostrarMes && <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', padding: '16px 0 8px' }}>{evMes}</div>}
+                        <div style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer', overflow: 'hidden' }}
+                          onClick={() => setModalEvento({ tipo: 'ver', evento: ev })}>
+                          {/* Data à esquerda */}
+                          <div style={{ width: '56px', textAlign: 'center', flexShrink: 0, padding: '16px 0' }}>
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>{DIAS_SEMANA[ev.data.getDay()]}</div>
+                            <div style={{ fontSize: '28px', fontWeight: 900, color: ev.data.toDateString() === hoje.toDateString() ? '#F97310' : '#0f1117', lineHeight: 1.1 }}>{ev.data.getDate()}</div>
+                          </div>
+                          {/* Card com faixa colorida + fundo claro */}
+                          <div style={{ flex: 1, display: 'flex', borderRadius: '10px', overflow: 'hidden', margin: '8px 12px 8px 0' }}>
+                            <div style={{ width: '5px', background: ev.cor, flexShrink: 0 }} />
+                            <div style={{ flex: 1, padding: '10px 14px', background: ev.cor === '#ffffff' ? '#f9fafb' : ev.cor === '#0f1117' ? '#f3f4f6' : '#fff4ec' }}>
+                              <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f1117' }}>{ev.titulo}</div>
+                              <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '3px' }}>{ev.horaInicio || ev.hora} – {ev.horaFim || '—'}{ev.local ? ` · ${ev.local}` : ''}</div>
+                              {ev.descricao && <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>{ev.descricao}</div>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            }
+
+            return (
+              <>
+                {/* Modal novo evento / ver evento */}
+                {modalEvento && (
+                  <div style={s.modalOverlay} onClick={() => { setModalEvento(null); setConfirmarExclusao(false) }}>
+                    <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                      {modalEvento.tipo === 'novo' ? (
+                        <>
+                          <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>
+                            Novo evento — {modalEvento.dia.getDate()} de {MESES[modalEvento.dia.getMonth()]}
+                          </h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            {/* Título - linha inteira */}
+                            <div>
+                              <label style={s.fieldLabel}>Título</label>
+                              <input style={s.inputEdit} value={formEvento.titulo} onChange={e => setFormEvento(f => ({ ...f, titulo: e.target.value }))} placeholder="Nome do evento" autoFocus />
+                            </div>
+                            {/* Data + Início + Fim em 3 colunas */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                              <div>
+                                <label style={s.fieldLabel}>Data</label>
+                                <input type="date" style={s.inputEdit} value={formEvento.data} onChange={e => setFormEvento(f => ({ ...f, data: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label style={s.fieldLabel}>Início</label>
+                                <input type="time" style={s.inputEdit} value={formEvento.horaInicio} onChange={e => setFormEvento(f => ({ ...f, horaInicio: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label style={s.fieldLabel}>Fim</label>
+                                <input type="time" style={s.inputEdit} value={formEvento.horaFim} onChange={e => setFormEvento(f => ({ ...f, horaFim: e.target.value }))} />
+                              </div>
+                            </div>
+                            {/* Local + Equipe em 2 colunas */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                              <div style={{ position: 'relative' }}>
+                                <label style={s.fieldLabel}>Local</label>
+                                <input style={s.inputEdit} value={formEvento.local} onChange={e => setFormEvento(f => ({ ...f, local: e.target.value }))} placeholder="Pesquisar local..." autoComplete="off" />
+                                {formEvento.local.length > 0 && locais.filter(l => l.nome.toLowerCase().includes(formEvento.local.toLowerCase()) || l.bairro?.toLowerCase().includes(formEvento.local.toLowerCase())).length > 0 && (
+                                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
+                                    {locais.filter(l => l.nome.toLowerCase().includes(formEvento.local.toLowerCase()) || l.bairro?.toLowerCase().includes(formEvento.local.toLowerCase())).slice(0, 8).map(l => (
+                                      <div key={l.id}
+                                        style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                                        onClick={() => setFormEvento(f => ({ ...f, local: l.nome }))}>
+                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <label style={s.fieldLabel}>Equipe</label>
+                                <input style={s.inputEdit} value={formEvento.equipe} onChange={e => setFormEvento(f => ({ ...f, equipe: e.target.value }))} placeholder="Nome da equipe" />
+                              </div>
+                            </div>
+                            <div>
+                              <label style={s.fieldLabel}>Descrição</label>
+                              <textarea style={{ ...s.inputEdit, minHeight: '80px', resize: 'vertical' }} value={formEvento.descricao} onChange={e => setFormEvento(f => ({ ...f, descricao: e.target.value }))} placeholder="Opcional" />
+                            </div>
+                            <div>
+                              <label style={s.fieldLabel}>Cor</label>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                {['#F97310','#0f1117','#ffffff'].map(cor => (
+                                  <div key={cor} onClick={() => setFormEvento(f => ({ ...f, cor }))}
+                                    style={{ width: '32px', height: '32px', borderRadius: '50%', background: cor, cursor: 'pointer', border: formEvento.cor === cor ? '3px solid #F97310' : '2px solid #e5e7eb', boxSizing: 'border-box' }} />
+                                ))}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                              <button style={s.backBtn} onClick={() => setModalEvento(null)}>Cancelar</button>
+                              <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1 }} onClick={salvarEvento}>Criar evento</button>
+                            </div>
+                          </div>
+                        </>
+                      ) : modalEvento.tipo === 'editar' ? (
+                        <>
+                          <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Editar evento</h3>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div>
+                              <label style={s.fieldLabel}>Título</label>
+                              <input style={s.inputEdit} value={formEditEvento.titulo} onChange={e => setFormEditEvento(f => ({ ...f, titulo: e.target.value }))} autoFocus />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                              <div>
+                                <label style={s.fieldLabel}>Data</label>
+                                <input type="date" style={s.inputEdit} value={formEditEvento.data} onChange={e => setFormEditEvento(f => ({ ...f, data: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label style={s.fieldLabel}>Início</label>
+                                <input type="time" style={s.inputEdit} value={formEditEvento.horaInicio} onChange={e => setFormEditEvento(f => ({ ...f, horaInicio: e.target.value }))} />
+                              </div>
+                              <div>
+                                <label style={s.fieldLabel}>Fim</label>
+                                <input type="time" style={s.inputEdit} value={formEditEvento.horaFim} onChange={e => setFormEditEvento(f => ({ ...f, horaFim: e.target.value }))} />
+                              </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                              <div style={{ position: 'relative' }}>
+                                <label style={s.fieldLabel}>Local</label>
+                                <input style={s.inputEdit} value={formEditEvento.local || ''} onChange={e => setFormEditEvento(f => ({ ...f, local: e.target.value }))} placeholder="Pesquisar local..." autoComplete="off" />
+                                {(formEditEvento.local || '').length > 0 && locais.filter(l => l.nome.toLowerCase().includes((formEditEvento.local || '').toLowerCase()) || l.bairro?.toLowerCase().includes((formEditEvento.local || '').toLowerCase())).length > 0 && (
+                                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
+                                    {locais.filter(l => l.nome.toLowerCase().includes((formEditEvento.local || '').toLowerCase()) || l.bairro?.toLowerCase().includes((formEditEvento.local || '').toLowerCase())).slice(0, 8).map(l => (
+                                      <div key={l.id}
+                                        style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                                        onClick={() => setFormEditEvento(f => ({ ...f, local: l.nome }))}>
+                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <label style={s.fieldLabel}>Equipe</label>
+                                <input style={s.inputEdit} value={formEditEvento.equipe || ''} onChange={e => setFormEditEvento(f => ({ ...f, equipe: e.target.value }))} placeholder="Nome da equipe" />
+                              </div>
+                            </div>
+                            <div>
+                              <label style={s.fieldLabel}>Descrição</label>
+                              <textarea style={{ ...s.inputEdit, minHeight: '80px', resize: 'vertical' }} value={formEditEvento.descricao} onChange={e => setFormEditEvento(f => ({ ...f, descricao: e.target.value }))} placeholder="Opcional" />
+                            </div>
+                            <div>
+                              <label style={s.fieldLabel}>Cor</label>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                {['#F97310','#0f1117','#ffffff'].map(cor => (
+                                  <div key={cor} onClick={() => setFormEditEvento(f => ({ ...f, cor }))}
+                                    style={{ width: '32px', height: '32px', borderRadius: '50%', background: cor, cursor: 'pointer', border: formEditEvento.cor === cor ? '3px solid #F97310' : '2px solid #e5e7eb', boxSizing: 'border-box' }} />
+                                ))}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                              <button style={s.backBtn} onClick={() => setModalEvento({ tipo: 'ver', evento: modalEvento.evento })}>Cancelar</button>
+                              <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1 }} onClick={async () => {
+                                if (!formEditEvento.titulo.trim()) return
+                                const payload = {
+                                  titulo: formEditEvento.titulo,
+                                  data: formEditEvento.data,
+                                  hora_inicio: formEditEvento.horaInicio,
+                                  hora_fim: formEditEvento.horaFim,
+                                  cor: formEditEvento.cor,
+                                  descricao: formEditEvento.descricao || null,
+                                  local: formEditEvento.local || null,
+                                  equipe: formEditEvento.equipe || null,
+                                }
+                                const { error } = await supabase.from('eventos').update(payload).eq('id', modalEvento.evento.id)
+                                if (!error) {
+                                  const [y, m, d] = formEditEvento.data.split('-').map(Number)
+                                  const atualizado = { ...modalEvento.evento, ...formEditEvento, data: new Date(y, m-1, d), hora: formEditEvento.horaInicio }
+                                  setAgendaEventos(ev => ev.map(e => e.id === atualizado.id ? atualizado : e))
+                                }
+                                setModalEvento(null)
+                              }}>Salvar</button>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {/* X fechar */}
+                          <button onClick={() => { setModalEvento(null); setConfirmarExclusao(false) }} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+
+                          {!confirmarExclusao && (
+                            <div style={{ marginBottom: '24px' }}>
+                              {/* Título com bolinha de cor */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', paddingBottom: '16px', borderBottom: '1.5px solid #f3f4f6' }}>
+                                <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: modalEvento.evento.cor, border: '2px solid #e5e7eb', flexShrink: 0 }} />
+                                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', margin: 0 }}>{modalEvento.evento.titulo}</h3>
+                              </div>
+                              {/* Informações em linhas */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                  <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '80px' }}>Data</span>
+                                  <span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{DIAS_SEMANA[modalEvento.evento.data.getDay()]}, {modalEvento.evento.data.getDate()} de {MESES[modalEvento.evento.data.getMonth()]} de {modalEvento.evento.data.getFullYear()}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                  <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '80px' }}>Horário</span>
+                                  <span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{modalEvento.evento.horaInicio || modalEvento.evento.hora} – {modalEvento.evento.horaFim || '—'}</span>
+                                </div>
+                                {modalEvento.evento.local && (
+                                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                    <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '80px' }}>Local</span>
+                                    <span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{modalEvento.evento.local}</span>
+                                  </div>
+                                )}
+                                {modalEvento.evento.equipe && (
+                                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                    <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '80px' }}>Equipe</span>
+                                    <span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{modalEvento.evento.equipe}</span>
+                                  </div>
+                                )}
+                                {modalEvento.evento.descricao && (
+                                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                                    <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '80px' }}>Observações</span>
+                                    <span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{modalEvento.evento.descricao}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {confirmarExclusao ? (
+                            <div style={{ padding: '8px 0' }}>
+                              <p style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117', margin: '0 0 16px', textAlign: 'center' }}>Tem certeza que deseja excluir este evento?</p>
+                              <div style={{ display: 'flex', gap: '10px' }}>
+                                <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => setConfirmarExclusao(false)}>Cancelar</button>
+                                <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#0f1117', color: '#fff', borderColor: '#0f1117' }} onClick={() => { excluirEvento(modalEvento.evento.id); setConfirmarExclusao(false) }}>Sim, excluir</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => {
+                                const ev = modalEvento.evento
+                                const d = ev.data
+                                setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '' })
+                                setModalEvento({ tipo: 'editar', evento: ev })
+                              }}>Editar</button>
+                              <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => setConfirmarExclusao(true)}>Excluir</button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Toolbar */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button onClick={() => { if (locais.length === 0) carregarLocais(); const d = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`; setFormEvento({ titulo: '', data: d, horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', equipe: '' }); setModalEvento({ tipo: 'novo', dia: hoje }) }} style={{ ...s.editBtn, background: '#F97310', color: '#fff', fontSize: '13px', padding: '6px 16px' }}>+ Novo evento</button>
+                    <button onClick={irHoje} style={{ ...s.backBtn, fontSize: '13px', padding: '6px 16px' }}>Hoje</button>
+                    <button onClick={navAnterior} style={{ width: '32px', height: '32px', border: '1.5px solid #e5e7eb', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+                    <button onClick={navProximo} style={{ width: '32px', height: '32px', border: '1.5px solid #e5e7eb', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+                    <span style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginLeft: '4px' }}>{tituloNav()}</span>
+                  </div>
+                  <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '10px', padding: '3px', gap: '2px' }}>
+                    {[['dia','Dia'],['semana','Semana'],['mes','Mês'],['agenda','Agenda']].map(([v, l]) => (
+                      <button key={v} onClick={() => setAgendaView(v)}
+                        style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px', fontWeight: 700, background: agendaView === v ? '#fff' : 'transparent', color: agendaView === v ? '#F97310' : '#6b7280', boxShadow: agendaView === v ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {agendaView === 'mes' && renderMes()}
+                {agendaView === 'semana' && renderSemana()}
+                {agendaView === 'dia' && renderDia()}
+                {agendaView === 'agenda' && renderAgenda()}
+              </>
+            )
+          })()}
+
           {menu === 'locais' && (
             <>
               <h2 style={s.pageTitle}>Locais</h2>
@@ -849,7 +1498,44 @@ export default function Dashboard() {
 
           {menu === 'usuarios' && (
             <>
-              <h2 style={s.pageTitle}>Usuários</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                <h2 style={{ ...s.pageTitle, marginBottom: 0 }}>Usuários</h2>
+                <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={() => setModalNovoUsuario(true)}>+ Adicionar</button>
+              </div>
+
+              {modalNovoUsuario && (
+                <div style={s.modalOverlay} onClick={() => setModalNovoUsuario(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117', marginBottom: '24px' }}>Novo Usuário</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      {[['Nome', 'nome', 'text'], ['Email', 'email', 'email'], ['Senha', 'senha', 'password'], ['Telefone', 'telefone', 'text']].map(([label, key, type]) => (
+                        <div key={key}>
+                          <label style={s.fieldLabel}>{label}</label>
+                          <input type={type} style={s.inputEdit} value={formNovoUsuario[key]} onChange={e => setFormNovoUsuario(f => ({ ...f, [key]: e.target.value }))} />
+                        </div>
+                      ))}
+                      <div>
+                        <label style={s.fieldLabel}>Perfil</label>
+                        <select style={s.inputEdit} value={formNovoUsuario.perfil} onChange={e => setFormNovoUsuario(f => ({ ...f, perfil: e.target.value }))}>
+                          <option value="admin">Admin</option>
+                          <option value="lider">Líder</option>
+                          <option value="voluntario">Voluntário</option>
+                          <option value="igreja">Igreja</option>
+                          <option value="prefeitura">Prefeitura</option>
+                        </select>
+                      </div>
+                      {erroUsuario && <p style={{ color: '#0f1117', fontSize: '13px', margin: 0 }}>{erroUsuario}</p>}
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                        <button style={s.backBtn} onClick={() => setModalNovoUsuario(false)}>Cancelar</button>
+                        <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1 }} onClick={criarUsuario} disabled={salvandoUsuario}>
+                          {salvandoUsuario ? 'Criando...' : 'Criar usuário'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {loadingUsers && <p style={s.info}>Carregando...</p>}
               {!loadingUsers && usuarios.length === 0 && <p style={s.info}>Nenhum usuário cadastrado.</p>}
               <div style={s.cards}>
@@ -890,6 +1576,11 @@ export default function Dashboard() {
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
             </svg>
           )},
+          { key: 'agenda', path: '/sistema/agenda', label: 'Agenda', icon: (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          )},
           { key: 'dashboard', path: '/sistema/dashboard', label: 'Dashboard', icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
@@ -915,7 +1606,7 @@ export default function Dashboard() {
             <div style={{ ...s.dropdown, bottom: '64px', top: 'auto', right: 0 }}>
               <button style={s.dropdownItem} onClick={() => setDropdownOpen(false)}>Editar usuário</button>
               <div style={s.dropdownDivider} />
-              <button style={{ ...s.dropdownItem, color: '#ef4444' }} onClick={handleSignOut}>Sair</button>
+              <button style={{ ...s.dropdownItem, color: '#0f1117' }} onClick={handleSignOut}>Sair</button>
             </div>
           )}
         </div>
@@ -928,12 +1619,12 @@ export default function Dashboard() {
 function VoluntarioCard({ v, onClick }) {
   const pendente = camposFaltando(v).length > 0
   return (
-    <div style={{ ...s.card, ...(pendente ? { borderLeft: '4px solid #ef4444' } : {}) }} onClick={onClick}>
+    <div style={{ ...s.card, ...(pendente ? { borderLeft: '4px solid #0f1117' } : {}) }} onClick={onClick}>
       <div style={s.cardAvatar}>{v.nome_completo?.[0]?.toUpperCase()}</div>
       <div style={s.cardInfo}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={s.cardNome}>{v.nome_completo}</span>
-          {pendente && <span style={{ fontSize: '11px', fontWeight: 700, color: '#ef4444', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', padding: '1px 6px' }}>incompleto</span>}
+          {pendente && <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f1117', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '4px', padding: '1px 6px' }}>incompleto</span>}
         </div>
         <div style={s.cardSub}>{v.cidade_estado_pais}</div>
         <div style={s.cardSub}>{v.idade} anos</div>

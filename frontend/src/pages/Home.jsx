@@ -1,8 +1,31 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+
+const DIAS_SEMANA_CURTO = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
+const MESES_FULL = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 export default function Home() {
   const navigate = useNavigate()
+  const [eventos, setEventos] = useState([])
+  const [calMes, setCalMes] = useState(() => { const h = new Date(); return new Date(h.getFullYear(), h.getMonth(), 1) })
+  const [calDiaSelecionado, setCalDiaSelecionado] = useState(null) // { diaObj, evsDia }
+  const [calEventoAberto, setCalEventoAberto] = useState(null) // id do evento expandido
+
+  useEffect(() => {
+    if (calDiaSelecionado) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [calDiaSelecionado])
+
+  useEffect(() => {
+    supabase.from('eventos').select('*').order('data').order('hora_inicio').then(({ data }) => {
+      if (data) setEventos(data)
+    })
+  }, [])
 
   useEffect(() => {
     // Countdown
@@ -448,6 +471,7 @@ export default function Home() {
           <li><a href="#ibirite">Ibirité</a></li>
           <li><a href="#evangelho">Evangelho</a></li>
           <li><a href="#missao">Missão</a></li>
+          <li><a href="#agenda">Agenda</a></li>
         </ul>
         <div className="nav-right">
           <button className="btn-nav">Voluntariar</button>
@@ -464,6 +488,7 @@ export default function Home() {
         <a href="#ibirite">Ibirité</a>
         <a href="#evangelho">Evangelho</a>
         <a href="#missao">Missão</a>
+        <a href="#agenda">Agenda</a>
         <a href="#" id="btn-entrar-mobile" style={{color:'var(--orange)',fontWeight:800,borderBottom:'none',marginTop:8}}>Voluntariar</a>
       </div>
 
@@ -665,21 +690,125 @@ export default function Home() {
           <span className="sec-eyebrow">Programação Oficial</span>
           <h2 className="sec-h2">Nossa <span>Agenda</span> · 27 Jun a 05 Jul<span className="sec-h2-line"></span></h2>
         </div>
-        <div className="agenda-table-wrap r2">
-          <table className="ag-table">
-            <thead><tr><th>Data</th><th>Dia</th><th>Atividade</th><th>Descrição</th><th></th></tr></thead>
-            <tbody>
-              <tr><td><span className="ag-day">27 Jun</span></td><td><span className="ag-weekday">Sábado</span></td><td><span className="ag-event">Abertura Oficial</span></td><td className="ag-desc-td">Culto de abertura e envio das equipes para todos os setores.</td><td className="ag-badge-td"><span>Abertura</span></td></tr>
-              <tr><td><span className="ag-day">28 Jun</span></td><td><span className="ag-weekday">Domingo</span></td><td><span className="ag-event">Igrejas Locais</span></td><td className="ag-desc-td">Integração e mobilização com igrejas parceiras de Ibirité.</td><td className="ag-badge-td"><span>Igrejas</span></td></tr>
-              <tr><td><span className="ag-day">29 Jun</span></td><td><span className="ag-weekday">Segunda</span></td><td><span className="ag-event">Escolas e Ônibus</span></td><td className="ag-desc-td">Palestras em escolas e evangelismo de fluxo nos transportes.</td><td className="ag-badge-td"><span>Escolas</span></td></tr>
-              <tr><td><span className="ag-day">30 Jun</span></td><td><span className="ag-weekday">Terça</span></td><td><span className="ag-event">Casa em Casa</span></td><td className="ag-desc-td">Duplas percorrem bairros mapeados de porta em porta.</td><td className="ag-badge-td"><span>Lares</span></td></tr>
-              <tr><td><span className="ag-day">01 Jul</span></td><td><span className="ag-weekday">Quarta</span></td><td><span className="ag-event">Ação Social</span></td><td className="ag-desc-td">Visitas a lares de idosos, abrigos, hospital e casas de recuperação.</td><td className="ag-badge-td"><span>Social</span></td></tr>
-              <tr><td><span className="ag-day">02 Jul</span></td><td><span className="ag-weekday">Quinta</span></td><td><span className="ag-event">Praças & Ruas</span></td><td className="ag-desc-td">Louvor ao ar livre, pregação direta e oração por pessoas.</td><td className="ag-badge-td"><span>Praças</span></td></tr>
-              <tr><td><span className="ag-day">03 Jul</span></td><td><span className="ag-weekday">Sexta</span></td><td><span className="ag-event">Evangelismo Geral</span></td><td className="ag-desc-td">Todos os setores em ação simultânea pela cidade.</td><td className="ag-badge-td"><span>Geral</span></td></tr>
-              <tr><td><span className="ag-day">04 Jul</span></td><td><span className="ag-weekday">Sábado</span></td><td><span className="ag-event">Grande Concentração</span></td><td className="ag-desc-td">Culto público com toda a cidade e apelo evangelístico coletivo.</td><td className="ag-badge-td"><span>Concentração</span></td></tr>
-              <tr className="final"><td><span className="ag-day">05 Jul</span></td><td><span className="ag-weekday">Domingo · Encerramento</span></td><td><span className="ag-event">Culto da Cruzada</span></td><td className="ag-desc-td">Grande colheita final louvor, palavra evangelística, apelo e consolidação.</td><td className="ag-badge-td"><span>Grande Final</span></td></tr>
-            </tbody>
-          </table>
+        {/* Modal dia */}
+        {calDiaSelecionado && (
+          <div onClick={() => { setCalDiaSelecionado(null); setCalEventoAberto(null) }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
+            <div onClick={e => e.stopPropagation()} style={{background:'#fff',borderRadius:'16px',width:'100%',maxWidth:'440px',padding:'32px',position:'relative',maxHeight:'80vh',overflowY:'auto'}}>
+              <button onClick={() => { setCalDiaSelecionado(null); setCalEventoAberto(null) }} style={{position:'absolute',top:'16px',right:'16px',background:'#f3f4f6',border:'none',borderRadius:'50%',width:'32px',height:'32px',cursor:'pointer',fontSize:'14px',fontWeight:700}}>✕</button>
+              {calEventoAberto ? (
+                // Tela de detalhe do evento
+                <>
+                  <button onClick={() => setCalEventoAberto(null)} style={{display:'flex',alignItems:'center',gap:'6px',background:'none',border:'none',cursor:'pointer',color:'#F97310',fontWeight:700,fontSize:'13px',marginBottom:'20px',padding:0,fontFamily:'inherit'}}>
+                    ← Voltar
+                  </button>
+                  {(() => {
+                    const ev = calDiaSelecionado.evsDia.find(e => e.id === calEventoAberto)
+                    if (!ev) return null
+                    return (
+                      <div>
+                        <div style={{display:'flex',alignItems:'center',gap:'10px',marginBottom:'20px',paddingBottom:'16px',borderBottom:'1.5px solid #f3f4f6'}}>
+                          <div style={{width:'12px',height:'12px',borderRadius:'50%',background:ev.cor||'#F97310',flexShrink:0}}/>
+                          <h3 style={{fontSize:'18px',fontWeight:800,color:'#0f1117',margin:0}}>{ev.titulo}</h3>
+                        </div>
+                        <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+                          <div style={{display:'flex',gap:'10px'}}><span style={{fontSize:'13px',color:'#9ca3af',fontWeight:700,minWidth:'90px'}}>Horário</span><span style={{fontSize:'13px',color:'#0f1117',fontWeight:600}}>{ev.hora_inicio?.slice(0,5)} – {ev.hora_fim?.slice(0,5)||'—'}</span></div>
+                          {ev.local && <div style={{display:'flex',gap:'10px'}}><span style={{fontSize:'13px',color:'#9ca3af',fontWeight:700,minWidth:'90px'}}>Local</span><span style={{fontSize:'13px',color:'#0f1117',fontWeight:600}}>{ev.local}</span></div>}
+                          {ev.equipe && <div style={{display:'flex',gap:'10px'}}><span style={{fontSize:'13px',color:'#9ca3af',fontWeight:700,minWidth:'90px'}}>Equipe</span><span style={{fontSize:'13px',color:'#0f1117',fontWeight:600}}>{ev.equipe}</span></div>}
+                          {ev.descricao && <div style={{display:'flex',gap:'10px'}}><span style={{fontSize:'13px',color:'#9ca3af',fontWeight:700,minWidth:'90px'}}>Observações</span><span style={{fontSize:'13px',color:'#0f1117',fontWeight:600}}>{ev.descricao}</span></div>}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </>
+              ) : (
+                // Tela de lista
+                <>
+                  <div style={{marginBottom:'20px',paddingBottom:'16px',borderBottom:'2px solid #F97310'}}>
+                    <div style={{fontSize:'13px',fontWeight:700,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'1px'}}>{DIAS_SEMANA_CURTO[calDiaSelecionado.diaObj.getDay()]}</div>
+                    <div style={{fontSize:'28px',fontWeight:900,color:'#0f1117',lineHeight:1.1}}>{calDiaSelecionado.diaObj.getDate()} de {MESES_FULL[calDiaSelecionado.diaObj.getMonth()]} · {calDiaSelecionado.diaObj.getFullYear()}</div>
+                    <div style={{fontSize:'13px',color:'#9ca3af',marginTop:'4px'}}>{calDiaSelecionado.evsDia.length} evento{calDiaSelecionado.evsDia.length !== 1 ? 's' : ''}</div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column'}}>
+                    {calDiaSelecionado.evsDia.map((ev, idx) => (
+                      <div key={ev.id} onClick={() => setCalEventoAberto(ev.id)}
+                        style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 0',borderBottom: idx < calDiaSelecionado.evsDia.length - 1 ? '1px solid #f3f4f6' : 'none',cursor:'pointer'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:'10px'}}>
+                          <div style={{width:'8px',height:'8px',borderRadius:'50%',background:ev.cor||'#F97310',flexShrink:0}}/>
+                          <span style={{fontSize:'14px',fontWeight:700,color:'#0f1117'}}>{ev.titulo}</span>
+                        </div>
+                        <span style={{fontSize:'13px',fontWeight:700,color:'#F97310',whiteSpace:'nowrap',marginLeft:'16px'}}>{ev.hora_inicio?.slice(0,5)} – {ev.hora_fim?.slice(0,5)||'—'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Calendário mensal */}
+        <div className="r2" style={{marginTop:'52px'}}>
+          {/* Toolbar */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
+              <button onClick={() => setCalMes(d => new Date(d.getFullYear(), d.getMonth()-1, 1))} style={{width:'36px',height:'36px',border:'1.5px solid #e5e7eb',borderRadius:'8px',background:'#fff',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>‹</button>
+              <button onClick={() => setCalMes(d => new Date(d.getFullYear(), d.getMonth()+1, 1))} style={{width:'36px',height:'36px',border:'1.5px solid #e5e7eb',borderRadius:'8px',background:'#fff',cursor:'pointer',fontSize:'16px',display:'flex',alignItems:'center',justifyContent:'center'}}>›</button>
+              <span style={{fontSize:'20px',fontWeight:900,color:'#0f1117'}}>{MESES_FULL[calMes.getMonth()]} {calMes.getFullYear()}</span>
+            </div>
+            <button onClick={() => setCalMes(new Date(new Date().getFullYear(), new Date().getMonth(), 1))} style={{border:'2px solid #F97310',color:'#F97310',background:'none',fontWeight:700,fontSize:'13px',padding:'6px 16px',borderRadius:'8px',cursor:'pointer',fontFamily:'inherit'}}>Hoje</button>
+          </div>
+
+          {/* Grade */}
+          <div style={{background:'#fff',borderRadius:'16px',overflow:'hidden',boxShadow:'0 4px 24px rgba(0,0,0,0.08)'}}>
+            {/* Cabeçalho dias da semana */}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',borderBottom:'2px solid #F97310'}}>
+              {DIAS_SEMANA_CURTO.map(d => (
+                <div key={d} style={{padding:'12px 0',textAlign:'center',fontSize:'12px',fontWeight:800,color:'#9ca3af',textTransform:'uppercase',letterSpacing:'0.5px'}}>{d}</div>
+              ))}
+            </div>
+            {/* Células */}
+            {(() => {
+              const hoje = new Date()
+              const ano = calMes.getFullYear()
+              const mes = calMes.getMonth()
+              const primeiroDia = new Date(ano, mes, 1).getDay()
+              const diasNoMes = new Date(ano, mes+1, 0).getDate()
+              const totalCelulas = Math.ceil((primeiroDia + diasNoMes) / 7) * 7
+              const celulas = []
+              for (let i = 0; i < totalCelulas; i++) {
+                const diaNum = i - primeiroDia + 1
+                const valido = diaNum >= 1 && diaNum <= diasNoMes
+                const diaObj = valido ? new Date(ano, mes, diaNum) : null
+                const ehHoje = diaObj && diaObj.toDateString() === hoje.toDateString()
+                const evsDia = valido ? eventos.filter(e => {
+                  const ed = new Date(e.data + 'T00:00:00')
+                  return ed.getFullYear()===ano && ed.getMonth()===mes && ed.getDate()===diaNum
+                }) : []
+                celulas.push({ diaNum, valido, ehHoje, evsDia, i })
+              }
+              return (
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)'}}>
+                  {celulas.map((c, idx) => (
+                    <div key={idx} style={{minHeight:'100px',borderRight:(idx+1)%7===0?'none':'1px solid #f3f4f6',borderBottom:idx<celulas.length-7?'1px solid #f3f4f6':'none',padding:'8px',background:c.valido?'#fff':'#fafafa'}}>
+                      {c.valido && (
+                        <div style={{cursor: c.evsDia.length > 0 ? 'pointer' : 'default', height:'100%'}}
+                          onClick={() => c.evsDia.length > 0 && setCalDiaSelecionado({ diaObj: new Date(ano, mes, c.diaNum), evsDia: c.evsDia })}>
+                          <div style={{width:'28px',height:'28px',borderRadius:'50%',background:c.ehHoje?'#F97310':'transparent',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}>
+                            <span style={{fontSize:'13px',fontWeight:c.ehHoje?900:600,color:c.ehHoje?'#fff':'#374151'}}>{c.diaNum}</span>
+                          </div>
+                          {c.evsDia.length > 0 && (
+                            <div style={{width:'20px',height:'20px',borderRadius:'50%',background:'#F97310',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                              <span style={{fontSize:'10px',fontWeight:900,color:'#fff'}}>{c.evsDia.length}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+          </div>
         </div>
       </section>
 
