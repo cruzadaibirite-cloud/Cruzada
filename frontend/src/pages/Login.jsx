@@ -40,6 +40,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
+  const [showEncerrado, setShowEncerrado] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotMsg, setForgotMsg] = useState('')
   const [verseIdx, setVerseIdx] = useState(0)
@@ -79,6 +80,17 @@ export default function Login() {
   return (
     <div style={s.page} className="login-page">
       <style>{mobileStyle}</style>
+
+      {showEncerrado && (
+        <div onClick={() => setShowEncerrado(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'24px'}}>
+          <div onClick={e => e.stopPropagation()} style={{background:'#fff',borderRadius:'20px',width:'100%',maxWidth:'480px',padding:'40px 48px',textAlign:'center',position:'relative',boxShadow:'0 16px 64px rgba(0,0,0,0.2)'}}>
+            <button onClick={() => setShowEncerrado(false)} style={{position:'absolute',top:'16px',right:'16px',background:'#f3f4f6',border:'none',borderRadius:'50%',width:'32px',height:'32px',cursor:'pointer',fontSize:'14px',fontWeight:700,color:'#374151'}}>✕</button>
+            <h2 style={{fontSize:'20px',fontWeight:900,color:'#0f1117',margin:'0 0 10px'}}>Inscrições encerradas</h2>
+            <p style={{fontSize:'14px',color:'#9ca3af',lineHeight:1.6,margin:'0 0 24px'}}>As inscrições para a Cruzada Ibirité 2026 estão encerradas.</p>
+            <button onClick={() => setShowEncerrado(false)} style={{background:'#F97310',color:'#fff',border:'none',borderRadius:'50px',padding:'12px 32px',fontSize:'13px',fontWeight:800,cursor:'pointer',fontFamily:"'Nunito', sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Fechar</button>
+          </div>
+        </div>
+      )}
 
       {/* ESQUERDO — tela cheia com imagem */}
       <div style={s.left} className="login-left">
@@ -179,7 +191,7 @@ export default function Login() {
                 <div style={s.orLine}/><span style={s.orText}>não tem acesso?</span><div style={s.orLine}/>
               </div>
 
-              <a href="/cadastro-voluntario" style={s.btnOutline}>Quero fazer parte</a>
+              <button onClick={() => setShowEncerrado(true)} style={{...s.btnOutline, background:'none', cursor:'pointer', fontFamily:"'Nunito', sans-serif", width:'100%'}}>Quero fazer parte</button>
 
               <a href="/" style={s.backLink} className="login-back-link">← Voltar ao site</a>
             </>

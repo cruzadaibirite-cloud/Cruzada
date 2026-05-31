@@ -125,7 +125,7 @@ export default function Home() {
           --gray: #f4f4f6; --text: #1a1d27; --muted: #6b7280;
         }
         html { scroll-behavior: smooth; }
-        body { font-family: 'Nunito', 'Segoe UI', Arial, sans-serif; background: var(--white); color: var(--text); overflow-x: hidden; }
+        body { font-family: 'Nunito', 'Segoe UI', Arial, sans-serif; background: var(--white); color: var(--text); overflow-x: clip; }
         ::-webkit-scrollbar { width: 0; background: transparent; }
         * { scrollbar-width: none; }
         #custom-scroll { position: fixed; right: 0; top: 0; width: 4px; height: 100vh; z-index: 9998; pointer-events: none; opacity: 0; transition: opacity .3s; }
@@ -134,7 +134,7 @@ export default function Home() {
         .topbar a { color: rgba(255,255,255,.45); text-decoration: none; transition: color .2s; }
         .topbar a:hover { color: var(--orange); }
         .topbar-right { display: flex; gap: 24px; }
-        nav { background: var(--dark); padding: 0 72px; display: flex; align-items: center; justify-content: space-between; height: 72px; position: sticky; top: 0; z-index: 300; border-bottom: 3px solid var(--orange); box-shadow: 0 4px 32px rgba(0,0,0,.5); }
+        nav { background: var(--dark); padding: 0 72px; display: flex; align-items: center; justify-content: space-between; height: 72px; position: fixed; top: 0; left: 0; right: 0; z-index: 300; border-bottom: 3px solid var(--orange); box-shadow: 0 4px 32px rgba(0,0,0,.5); }
         .nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
         .nav-logo-mark { width: 38px; height: 38px; background: var(--orange); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 900; color: #fff; clip-path: polygon(4px 0%,100% 0%,calc(100% - 4px) 100%,0% 100%); }
         .nav-logo-text { font-size: 18px; font-weight: 900; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
@@ -146,7 +146,7 @@ export default function Home() {
         .nav-date { font-size: 12px; color: var(--orange); font-weight: 700; letter-spacing: 1px; }
         .btn-nav { background: var(--orange); color: #fff; padding: 11px 28px; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; text-decoration: none; transition: all .2s; white-space: nowrap; border-radius: 50px; cursor: pointer; border: none; font-family: inherit; }
         .btn-nav:hover { background: var(--orange2); box-shadow: 0 0 24px rgba(249,115,22,.5); }
-        .hero { background: var(--dark); min-height: 100dvh; position: relative; overflow: hidden; display: flex; align-items: center; }
+        .hero { background: var(--dark); min-height: 100dvh; position: relative; overflow: hidden; display: flex; align-items: center; padding-top: 75px; }
         .hero-map { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 30% 50%, rgba(249,115,22,.06) 0%, transparent 60%), url('/f1.jpg') center/cover no-repeat; filter: brightness(.12) saturate(.2); }
         .hero-inner { position: relative; z-index: 2; width: 100%; max-width: 1280px; margin: 0 auto; padding: 80px 72px; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 60px; }
         .hero-badge { display: inline-flex; align-items: center; gap: 10px; font-size: 10px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; color: var(--orange); margin-bottom: 24px; }
@@ -474,7 +474,7 @@ export default function Home() {
           <li><a href="#agenda">Agenda</a></li>
         </ul>
         <div className="nav-right">
-          <button className="btn-nav">Voluntariar</button>
+          <button className="btn-nav">Entrar</button>
           <button className="nav-hamburger" id="nav-hamburger" aria-label="Menu">
             <span></span><span></span><span></span>
           </button>
@@ -489,7 +489,7 @@ export default function Home() {
         <a href="#evangelho">Evangelho</a>
         <a href="#missao">Missão</a>
         <a href="#agenda">Agenda</a>
-        <a href="#" id="btn-entrar-mobile" style={{color:'var(--orange)',fontWeight:800,borderBottom:'none',marginTop:8}}>Voluntariar</a>
+        <a href="#" id="btn-entrar-mobile" style={{color:'var(--orange)',fontWeight:800,borderBottom:'none',marginTop:8}}>Entrar</a>
       </div>
 
       <section className="hero" id="inicio">
