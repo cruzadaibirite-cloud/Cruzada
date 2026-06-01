@@ -85,7 +85,8 @@ export default function Dashboard() {
   const [formEditEvento, setFormEditEvento] = useState({})
   const [buscaLocalEvento, setBuscaLocalEvento] = useState('')
   const [confirmarExclusao, setConfirmarExclusao] = useState(false)
-  const [formEvento, setFormEvento] = useState({ titulo: '', data: '', horaInicio: '', horaFim: '', cor: '#F97310', descricao: '', local: '', equipe: '' })
+  const [formEvento, setFormEvento] = useState({ titulo: '', data: '', horaInicio: '', horaFim: '', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', organizacaoId: null })
+  const [organizacoes, setOrganizacoes] = useState([])
   const [agendaDiaSelecionado, setAgendaDiaSelecionado] = useState(null) // { diaObj, evsDia }
   const [agendaDiaModal, setAgendaDiaModal] = useState(null) // modal da lista do dia
   const [agendaDiaEventoAberto, setAgendaDiaEventoAberto] = useState(null) // evento aberto no modal do dia
@@ -108,11 +109,11 @@ export default function Dashboard() {
     if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
     if (menu === 'usuarios') carregarUsuarios()
     if (menu === 'locais' || menu === 'agenda') carregarLocais()
-    if (menu === 'agenda') carregarEventos()
+    if (menu === 'agenda') { carregarEventos(); carregarOrganizacoes() }
   }, [menu])
 
   async function carregarEventos() {
-    const { data } = await supabase.from('eventos').select('*').order('data').order('hora_inicio')
+    const { data } = await supabase.from('eventos').select('*, locais(nome), organizacao(nome)').order('data').order('hora_inicio')
     if (data) {
       setAgendaEventos(data.map(e => ({
         id: e.id,
@@ -123,10 +124,17 @@ export default function Dashboard() {
         hora: e.hora_inicio?.slice(0, 5),
         cor: e.cor || '#F97310',
         descricao: e.descricao || '',
-        local: e.local || '',
-        equipe: e.equipe || '',
+        local: e.locais?.nome || e.local || '',
+        localId: e.local_id || null,
+        equipe: e.organizacao?.nome || e.equipe || '',
+        organizacaoId: e.organizacao_id || null,
       })))
     }
+  }
+
+  async function carregarOrganizacoes() {
+    const { data } = await supabase.from('organizacao').select('*').order('nome')
+    setOrganizacoes(data || [])
   }
 
   async function carregarLocais() {
@@ -264,7 +272,7 @@ export default function Dashboard() {
                         {ev.descricao && <div style={{ display: 'flex', gap: '10px' }}><span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '90px' }}>Observações</span><span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{ev.descricao}</span></div>}
                       </div>
                       <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-                        <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null); setModalEvento({ tipo: 'editar', evento: ev }); const d = ev.data; setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', equipe: ev.equipe || '' }) }}>Editar</button>
+                        <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null); setModalEvento({ tipo: 'editar', evento: ev }); const d = ev.data; setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', organizacaoId: ev.organizacaoId || null }) }}>Editar</button>
                         <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => { if (window.confirm(`Excluir "${ev.titulo}"?`)) { /* excluirEvento handled outside */ } }}>Excluir</button>
                       </div>
                     </div>
@@ -923,7 +931,7 @@ export default function Dashboard() {
             }
             function abrirNovoEvento(dia) {
               if (locais.length === 0) carregarLocais()
-              setFormEvento({ titulo: '', data: toInputDate(dia), horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', equipe: '' })
+              setFormEvento({ titulo: '', data: toInputDate(dia), horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', organizacaoId: null })
               setModalEvento({ tipo: 'novo', dia })
             }
             async function salvarEvento() {
@@ -935,12 +943,12 @@ export default function Dashboard() {
                 hora_fim: formEvento.horaFim,
                 cor: formEvento.cor,
                 descricao: formEvento.descricao || null,
-                local: formEvento.local || null,
-                equipe: formEvento.equipe || null,
+                local_id: formEvento.localId || null,
+                organizacao_id: formEvento.organizacaoId || null,
               }
-              const { data, error } = await supabase.from('eventos').insert(payload).select().single()
+              const { data, error } = await supabase.from('eventos').insert(payload).select('*, locais(nome), organizacao(nome)').single()
               if (!error && data) {
-                const novo = { id: data.id, titulo: data.titulo, data: new Date(data.data + 'T00:00:00'), horaInicio: data.hora_inicio?.slice(0,5), horaFim: data.hora_fim?.slice(0,5), hora: data.hora_inicio?.slice(0,5), cor: data.cor, descricao: data.descricao || '', local: data.local || '', equipe: data.equipe || '' }
+                const novo = { id: data.id, titulo: data.titulo, data: new Date(data.data + 'T00:00:00'), horaInicio: data.hora_inicio?.slice(0,5), horaFim: data.hora_fim?.slice(0,5), hora: data.hora_inicio?.slice(0,5), cor: data.cor, descricao: data.descricao || '', local: data.locais?.nome || '', localId: data.local_id, equipe: data.organizacao?.nome || '', organizacaoId: data.organizacao_id }
                 setAgendaEventos(ev => [...ev, novo])
               }
               setModalEvento(null)
@@ -1257,24 +1265,38 @@ export default function Dashboard() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                               <div style={{ position: 'relative' }}>
                                 <label style={s.fieldLabel}>Local</label>
-                                <input style={s.inputEdit} value={formEvento.local} onChange={e => setFormEvento(f => ({ ...f, local: e.target.value }))} placeholder="Pesquisar local..." autoComplete="off" />
-                                {formEvento.local.length > 0 && locais.filter(l => l.nome.toLowerCase().includes(formEvento.local.toLowerCase()) || l.bairro?.toLowerCase().includes(formEvento.local.toLowerCase())).length > 0 && (
+                                <input style={s.inputEdit} value={formEvento.local} onChange={e => setFormEvento(f => ({ ...f, local: e.target.value, localId: null }))} placeholder="Pesquisar local..." autoComplete="off" />
+                                {formEvento.local.length > 0 && !formEvento.localId && locais.filter(l => l.nome.toLowerCase().includes(formEvento.local.toLowerCase()) || l.bairro?.toLowerCase().includes(formEvento.local.toLowerCase())).length > 0 && (
                                   <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
                                     {locais.filter(l => l.nome.toLowerCase().includes(formEvento.local.toLowerCase()) || l.bairro?.toLowerCase().includes(formEvento.local.toLowerCase())).slice(0, 8).map(l => (
                                       <div key={l.id}
                                         style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
                                         onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
                                         onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                                        onClick={() => setFormEvento(f => ({ ...f, local: l.nome }))}>
+                                        onClick={() => setFormEvento(f => ({ ...f, local: l.nome, localId: l.id }))}>
                                         <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</div>
                                       </div>
                                     ))}
                                   </div>
                                 )}
                               </div>
-                              <div>
-                                <label style={s.fieldLabel}>Equipe</label>
-                                <input style={s.inputEdit} value={formEvento.equipe} onChange={e => setFormEvento(f => ({ ...f, equipe: e.target.value }))} placeholder="Nome da equipe" />
+                              <div style={{ position: 'relative' }}>
+                                <label style={s.fieldLabel}>Organização</label>
+                                <input style={s.inputEdit} value={formEvento.equipe} onChange={e => setFormEvento(f => ({ ...f, equipe: e.target.value, organizacaoId: null }))} placeholder="Pesquisar organização..." autoComplete="off" />
+                                {formEvento.equipe.length > 0 && !formEvento.organizacaoId && organizacoes.filter(o => o.nome.toLowerCase().includes(formEvento.equipe.toLowerCase())).length > 0 && (
+                                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
+                                    {organizacoes.filter(o => o.nome.toLowerCase().includes(formEvento.equipe.toLowerCase())).slice(0, 8).map(o => (
+                                      <div key={o.id}
+                                        style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                                        onClick={() => setFormEvento(f => ({ ...f, equipe: o.nome, organizacaoId: o.id }))}>
+                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{o.nome}</div>
+                                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>{o.tipo}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div>
@@ -1321,24 +1343,38 @@ export default function Dashboard() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                               <div style={{ position: 'relative' }}>
                                 <label style={s.fieldLabel}>Local</label>
-                                <input style={s.inputEdit} value={formEditEvento.local || ''} onChange={e => setFormEditEvento(f => ({ ...f, local: e.target.value }))} placeholder="Pesquisar local..." autoComplete="off" />
-                                {(formEditEvento.local || '').length > 0 && locais.filter(l => l.nome.toLowerCase().includes((formEditEvento.local || '').toLowerCase()) || l.bairro?.toLowerCase().includes((formEditEvento.local || '').toLowerCase())).length > 0 && (
+                                <input style={s.inputEdit} value={formEditEvento.local || ''} onChange={e => setFormEditEvento(f => ({ ...f, local: e.target.value, localId: null }))} placeholder="Pesquisar local..." autoComplete="off" />
+                                {(formEditEvento.local || '').length > 0 && !formEditEvento.localId && locais.filter(l => l.nome.toLowerCase().includes((formEditEvento.local || '').toLowerCase()) || l.bairro?.toLowerCase().includes((formEditEvento.local || '').toLowerCase())).length > 0 && (
                                   <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
                                     {locais.filter(l => l.nome.toLowerCase().includes((formEditEvento.local || '').toLowerCase()) || l.bairro?.toLowerCase().includes((formEditEvento.local || '').toLowerCase())).slice(0, 8).map(l => (
                                       <div key={l.id}
                                         style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
                                         onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
                                         onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                                        onClick={() => setFormEditEvento(f => ({ ...f, local: l.nome }))}>
+                                        onClick={() => setFormEditEvento(f => ({ ...f, local: l.nome, localId: l.id }))}>
                                         <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</div>
                                       </div>
                                     ))}
                                   </div>
                                 )}
                               </div>
-                              <div>
-                                <label style={s.fieldLabel}>Equipe</label>
-                                <input style={s.inputEdit} value={formEditEvento.equipe || ''} onChange={e => setFormEditEvento(f => ({ ...f, equipe: e.target.value }))} placeholder="Nome da equipe" />
+                              <div style={{ position: 'relative' }}>
+                                <label style={s.fieldLabel}>Organização</label>
+                                <input style={s.inputEdit} value={formEditEvento.equipe || ''} onChange={e => setFormEditEvento(f => ({ ...f, equipe: e.target.value, organizacaoId: null }))} placeholder="Pesquisar organização..." autoComplete="off" />
+                                {(formEditEvento.equipe || '').length > 0 && !formEditEvento.organizacaoId && organizacoes.filter(o => o.nome.toLowerCase().includes((formEditEvento.equipe || '').toLowerCase())).length > 0 && (
+                                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
+                                    {organizacoes.filter(o => o.nome.toLowerCase().includes((formEditEvento.equipe || '').toLowerCase())).slice(0, 8).map(o => (
+                                      <div key={o.id}
+                                        style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                                        onClick={() => setFormEditEvento(f => ({ ...f, equipe: o.nome, organizacaoId: o.id }))}>
+                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{o.nome}</div>
+                                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>{o.tipo}</div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div>
@@ -1365,13 +1401,13 @@ export default function Dashboard() {
                                   hora_fim: formEditEvento.horaFim,
                                   cor: formEditEvento.cor,
                                   descricao: formEditEvento.descricao || null,
-                                  local: formEditEvento.local || null,
-                                  equipe: formEditEvento.equipe || null,
+                                  local_id: formEditEvento.localId || null,
+                                  organizacao_id: formEditEvento.organizacaoId || null,
                                 }
                                 const { error } = await supabase.from('eventos').update(payload).eq('id', modalEvento.evento.id)
                                 if (!error) {
                                   const [y, m, d] = formEditEvento.data.split('-').map(Number)
-                                  const atualizado = { ...modalEvento.evento, ...formEditEvento, data: new Date(y, m-1, d), hora: formEditEvento.horaInicio }
+                                  const atualizado = { ...modalEvento.evento, ...formEditEvento, data: new Date(y, m-1, d), hora: formEditEvento.horaInicio, local: formEditEvento.local, equipe: formEditEvento.equipe }
                                   setAgendaEventos(ev => ev.map(e => e.id === atualizado.id ? atualizado : e))
                                 }
                                 setModalEvento(null)
@@ -1436,7 +1472,7 @@ export default function Dashboard() {
                               <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => {
                                 const ev = modalEvento.evento
                                 const d = ev.data
-                                setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '' })
+                                setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', organizacaoId: ev.organizacaoId || null })
                                 setModalEvento({ tipo: 'editar', evento: ev })
                               }}>Editar</button>
                               <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => setConfirmarExclusao(true)}>Excluir</button>
@@ -1451,7 +1487,7 @@ export default function Dashboard() {
                 {/* Toolbar */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button onClick={() => { if (locais.length === 0) carregarLocais(); const d = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`; setFormEvento({ titulo: '', data: d, horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', equipe: '' }); setModalEvento({ tipo: 'novo', dia: hoje }) }} style={{ ...s.editBtn, background: '#F97310', color: '#fff', fontSize: '13px', padding: '6px 16px' }}>+ Novo evento</button>
+                    <button onClick={() => { if (locais.length === 0) carregarLocais(); const d = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`; setFormEvento({ titulo: '', data: d, horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', organizacaoId: null }); setModalEvento({ tipo: 'novo', dia: hoje }) }} style={{ ...s.editBtn, background: '#F97310', color: '#fff', fontSize: '13px', padding: '6px 16px' }}>+ Novo evento</button>
                     <button onClick={irHoje} style={{ ...s.backBtn, fontSize: '13px', padding: '6px 16px' }}>Hoje</button>
                     <button onClick={navAnterior} style={{ width: '32px', height: '32px', border: '1.5px solid #e5e7eb', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
                     <button onClick={navProximo} style={{ width: '32px', height: '32px', border: '1.5px solid #e5e7eb', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
