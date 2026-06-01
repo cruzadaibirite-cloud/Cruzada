@@ -793,14 +793,17 @@ export default function Home() {
                       {c.valido && (
                         <div style={{cursor: c.evsDia.length > 0 ? 'pointer' : 'default', height:'100%'}}
                           onClick={() => c.evsDia.length > 0 && setCalDiaSelecionado({ diaObj: new Date(ano, mes, c.diaNum), evsDia: c.evsDia })}>
-                          <div style={{width:'28px',height:'28px',borderRadius:'50%',background:c.ehHoje?'#F97310':'transparent',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'6px'}}>
+                          <div style={{width:'28px',height:'28px',borderRadius:'50%',background:c.ehHoje?'#F97310':'transparent',display:'flex',alignItems:'center',justifyContent:'center',marginBottom:'4px'}}>
                             <span style={{fontSize:'13px',fontWeight:c.ehHoje?900:600,color:c.ehHoje?'#fff':'#374151'}}>{c.diaNum}</span>
                           </div>
-                          {c.evsDia.length > 0 && (
-                            <div style={{width:'20px',height:'20px',borderRadius:'50%',background:'#F97310',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                              <span style={{fontSize:'10px',fontWeight:900,color:'#fff'}}>{c.evsDia.length}</span>
-                            </div>
-                          )}
+                          <div style={{display:'flex',flexDirection:'column',gap:'2px'}}>
+                            {c.evsDia.slice(0,3).map(ev => (
+                              <div key={ev.id} style={{fontSize:'11px',fontWeight:700,color:ev.cor==='#ffffff'?'#0f1117':'#fff',background:ev.cor||'#F97310',borderRadius:'4px',padding:'2px 6px',overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>
+                                {ev.hora_inicio?.slice(0,5)} {ev.titulo}
+                              </div>
+                            ))}
+                            {c.evsDia.length > 3 && <div style={{fontSize:'10px',color:'#9ca3af',fontWeight:700}}>+{c.evsDia.length - 3} mais</div>}
+                          </div>
                         </div>
                       )}
                     </div>

@@ -86,7 +86,9 @@ export default function Dashboard() {
   const [buscaLocalEvento, setBuscaLocalEvento] = useState('')
   const [confirmarExclusao, setConfirmarExclusao] = useState(false)
   const [formEvento, setFormEvento] = useState({ titulo: '', data: '', horaInicio: '', horaFim: '', cor: '#F97310', descricao: '', local: '', equipe: '' })
-  const [agendaDiaSelecionado, setAgendaDiaSelecionado] = useState(null)
+  const [agendaDiaSelecionado, setAgendaDiaSelecionado] = useState(null) // { diaObj, evsDia }
+  const [agendaDiaModal, setAgendaDiaModal] = useState(null) // modal da lista do dia
+  const [agendaDiaEventoAberto, setAgendaDiaEventoAberto] = useState(null) // evento aberto no modal do dia
 
   useEffect(() => {
     async function carregarNome() {
@@ -235,6 +237,65 @@ export default function Dashboard() {
 
   return (
     <div style={s.page}>
+
+      {/* Modal lista do dia - agenda */}
+      {agendaDiaModal && (
+        <div style={s.modalOverlay} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null) }}>
+          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative', maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null) }} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+
+            {agendaDiaEventoAberto ? (
+              // Tela de detalhe
+              <>
+                <button onClick={() => setAgendaDiaEventoAberto(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontWeight: 700, fontSize: '13px', marginBottom: '20px', padding: 0, fontFamily: 'inherit' }}>← Voltar</button>
+                {(() => {
+                  const ev = agendaDiaModal.evsDia.find(e => e.id === agendaDiaEventoAberto)
+                  if (!ev) return null
+                  return (
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1.5px solid #f3f4f6' }}>
+                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: ev.cor || '#F97310', flexShrink: 0 }} />
+                        <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', margin: 0 }}>{ev.titulo}</h3>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', gap: '10px' }}><span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '90px' }}>Horário</span><span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{ev.horaInicio || ev.hora} – {ev.horaFim || '—'}</span></div>
+                        {ev.local && <div style={{ display: 'flex', gap: '10px' }}><span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '90px' }}>Local</span><span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{ev.local}</span></div>}
+                        {ev.equipe && <div style={{ display: 'flex', gap: '10px' }}><span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '90px' }}>Equipe</span><span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{ev.equipe}</span></div>}
+                        {ev.descricao && <div style={{ display: 'flex', gap: '10px' }}><span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '90px' }}>Observações</span><span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{ev.descricao}</span></div>}
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+                        <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null); setModalEvento({ tipo: 'editar', evento: ev }); const d = ev.data; setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', equipe: ev.equipe || '' }) }}>Editar</button>
+                        <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => { if (window.confirm(`Excluir "${ev.titulo}"?`)) { /* excluirEvento handled outside */ } }}>Excluir</button>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </>
+            ) : (
+              // Tela de lista
+              <>
+                <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '2px solid #F97310' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>{['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][agendaDiaModal.diaObj.getDay()]}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 900, color: '#0f1117', lineHeight: 1.2 }}>{agendaDiaModal.diaObj.getDate()} de {['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][agendaDiaModal.diaObj.getMonth()]} · {agendaDiaModal.diaObj.getFullYear()}</div>
+                  <div style={{ fontSize: '13px', color: '#9ca3af', marginTop: '4px' }}>{agendaDiaModal.evsDia.length} evento{agendaDiaModal.evsDia.length !== 1 ? 's' : ''}</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {agendaDiaModal.evsDia.map((ev, idx) => (
+                    <div key={ev.id} onClick={() => setAgendaDiaEventoAberto(ev.id)}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: idx < agendaDiaModal.evsDia.length - 1 ? '1px solid #f3f4f6' : 'none', cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: ev.cor || '#F97310', flexShrink: 0 }} />
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117' }}>{ev.titulo}</span>
+                      </div>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#F97310', whiteSpace: 'nowrap', marginLeft: '16px' }}>{ev.horaInicio || ev.hora} – {ev.horaFim || '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Modal campos pendentes */}
       {alertaCampos && (
@@ -917,7 +978,7 @@ export default function Dashboard() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
                     {celulas.map((c, i) => (
                       <div key={i}
-                        onClick={() => c.valido && abrirNovoEvento(c.diaObj)}
+                        onClick={() => c.valido && setAgendaDiaModal({ diaObj: c.diaObj, evsDia: c.eventos })}
                         style={{ minHeight: '100px', borderRight: (i + 1) % 7 === 0 ? 'none' : '1px solid #f3f4f6', borderBottom: i < celulas.length - 7 ? '1px solid #f3f4f6' : 'none', padding: '8px', background: c.valido ? '#fff' : '#fafafa', cursor: c.valido ? 'pointer' : 'default', position: 'relative' }}
                         onMouseEnter={e => c.valido && (e.currentTarget.style.background = '#fafffe')}
                         onMouseLeave={e => c.valido && (e.currentTarget.style.background = '#fff')}
@@ -930,10 +991,10 @@ export default function Dashboard() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                               {c.eventos.slice(0, 3).map(ev => (
                                 <div key={ev.id}
-                                  onClick={e => { e.stopPropagation(); setModalEvento({ tipo: 'ver', evento: ev }) }}
-                                  style={{ fontSize: '11px', fontWeight: 700, color: '#fff', background: ev.cor, borderRadius: '4px', padding: '2px 6px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'pointer' }}
+                                  onClick={e => { e.stopPropagation(); setAgendaDiaModal({ diaObj: c.diaObj, evsDia: c.eventos }) }}
+                                  style={{ fontSize: '11px', fontWeight: 700, color: ev.cor === '#ffffff' ? '#0f1117' : '#fff', background: ev.cor, borderRadius: '4px', padding: '2px 6px', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'pointer' }}
                                 >
-                                  {ev.horaInicio || ev.hora}–{ev.horaFim || ''} {ev.titulo}
+                                  {ev.horaInicio || ev.hora} {ev.titulo}
                                 </div>
                               ))}
                               {c.eventos.length > 3 && <div style={{ fontSize: '10px', color: '#9ca3af', fontWeight: 700 }}>+{c.eventos.length - 3} mais</div>}
