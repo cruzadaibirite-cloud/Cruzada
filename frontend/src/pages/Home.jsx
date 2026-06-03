@@ -410,7 +410,7 @@ export default function Home() {
         .r2.on { opacity: 1; transform: none; }
         @media (max-width: 768px) {
           .cal-desktop { display: none !important; }
-          .cal-mobile { display: block !important; }
+          .cal-mobile { display: block !important; margin-top: 24px !important; }
         }
         @media (min-width: 769px) {
           .cal-mobile { display: none !important; }
@@ -456,6 +456,8 @@ export default function Home() {
           .cta-right-area { display: none; }
           .galeria-grid { grid-template-columns: 1fr 1fr; grid-template-rows: 220px 180px 180px; }
           .galeria-item--tall { grid-column: 1 / 3; grid-row: auto; height: 220px; }
+          .sec-agenda { padding-top: 48px !important; }
+          .sec-setores { padding-bottom: 48px !important; }
           .agenda-table-wrap { border-radius: 12px; overflow-x: auto; }
           .ag-table { min-width: 560px; }
           .ag-desc-td { display: none; }
