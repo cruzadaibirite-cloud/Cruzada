@@ -90,6 +90,7 @@ export default function Dashboard() {
   const [agendaDiaSelecionado, setAgendaDiaSelecionado] = useState(null) // { diaObj, evsDia }
   const [agendaDiaModal, setAgendaDiaModal] = useState(null) // modal da lista do dia
   const [agendaDiaEventoAberto, setAgendaDiaEventoAberto] = useState(null) // evento aberto no modal do dia
+  const [mobileDiaSel, setMobileDiaSel] = useState(new Date())
 
   useEffect(() => {
     async function carregarNome() {
@@ -332,6 +333,8 @@ export default function Dashboard() {
 
       <style>{`
         @media (max-width: 768px) {
+          .agenda-mobile { display: block !important; }
+          .agenda-desktop { display: none !important; }
           .dash-sidebar { display: none !important; }
           .dash-profile-email { display: none !important; }
           .dash-profile-chevron { display: none !important; }
@@ -350,6 +353,7 @@ export default function Dashboard() {
         }
         @media (min-width: 769px) {
           .dash-bottomnav { display: none !important; }
+          .agenda-mobile { display: none !important; }
         }
       `}</style>
 
@@ -1484,29 +1488,140 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Toolbar */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <button onClick={() => { if (locais.length === 0) carregarLocais(); const d = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`; setFormEvento({ titulo: '', data: d, horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', organizacaoId: null }); setModalEvento({ tipo: 'novo', dia: hoje }) }} style={{ ...s.editBtn, background: '#F97310', color: '#fff', fontSize: '13px', padding: '6px 16px' }}>+ Novo evento</button>
-                    <button onClick={irHoje} style={{ ...s.backBtn, fontSize: '13px', padding: '6px 16px' }}>Hoje</button>
-                    <button onClick={navAnterior} style={{ width: '32px', height: '32px', border: '1.5px solid #e5e7eb', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
-                    <button onClick={navProximo} style={{ width: '32px', height: '32px', border: '1.5px solid #e5e7eb', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
-                    <span style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginLeft: '4px' }}>{tituloNav()}</span>
-                  </div>
-                  <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '10px', padding: '3px', gap: '2px' }}>
-                    {[['dia','Dia'],['semana','Semana'],['mes','Mês'],['agenda','Agenda']].map(([v, l]) => (
-                      <button key={v} onClick={() => setAgendaView(v)}
-                        style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px', fontWeight: 700, background: agendaView === v ? '#fff' : 'transparent', color: agendaView === v ? '#F97310' : '#6b7280', boxShadow: agendaView === v ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
-                        {l}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                {/* Vista Mobile */}
+                {(() => {
+                  const MESES_EXT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']
+                  const evsDia = agendaEventos.filter(e => e.data.toDateString() === mobileDiaSel.toDateString()).sort((a, b) => (a.horaInicio || '').localeCompare(b.horaInicio || ''))
+                  const ehHoje = mobileDiaSel.toDateString() === hoje.toDateString()
 
-                {agendaView === 'mes' && renderMes()}
-                {agendaView === 'semana' && renderSemana()}
-                {agendaView === 'dia' && renderDia()}
-                {agendaView === 'agenda' && renderAgenda()}
+                  // grade de dias clicáveis (semana ou mês)
+                  function DiasGrid() {
+                    const LETRAS = ['D','S','T','Q','Q','S','S']
+                    let celulas = []
+                    if (agendaView === 'semana') {
+                      const ini = new Date(mobileDiaSel)
+                      ini.setDate(ini.getDate() - ini.getDay())
+                      celulas = Array.from({ length: 7 }, (_, i) => { const d = new Date(ini); d.setDate(d.getDate() + i); return d })
+                    } else {
+                      const mA = mobileDiaSel.getMonth()
+                      const aA = mobileDiaSel.getFullYear()
+                      const primeiroDia = new Date(aA, mA, 1).getDay()
+                      const diasNoMes = new Date(aA, mA + 1, 0).getDate()
+                      const total = Math.ceil((primeiroDia + diasNoMes) / 7) * 7
+                      celulas = Array.from({ length: total }, (_, i) => {
+                        const diaNum = i - primeiroDia + 1
+                        return (diaNum >= 1 && diaNum <= diasNoMes) ? new Date(aA, mA, diaNum) : null
+                      })
+                    }
+                    const rows = []
+                    for (let i = 0; i < celulas.length; i += 7) rows.push(celulas.slice(i, i + 7))
+                    return (
+                      <div>
+                        {/* Cabeçalho letras */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', marginBottom: '4px' }}>
+                          {LETRAS.map((l, i) => <div key={i} style={{ textAlign: 'center', fontSize: '11px', fontWeight: 700, color: '#9ca3af', padding: '4px 0' }}>{l}</div>)}
+                        </div>
+                        {/* Linhas de dias */}
+                        {rows.map((row, ri) => (
+                          <div key={ri} style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+                            {row.map((d, di) => {
+                              if (!d) return <div key={di} />
+                              const sel = d.toDateString() === mobileDiaSel.toDateString()
+                              const dHoje = d.toDateString() === hoje.toDateString()
+                              const temEv = agendaEventos.some(e => e.data.toDateString() === d.toDateString())
+                              return (
+                                <div key={di} onClick={() => setMobileDiaSel(new Date(d))} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', cursor: 'pointer', padding: '4px 0' }}>
+                                  <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: sel ? '#F97310' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <span style={{ fontSize: '15px', fontWeight: 900, color: sel ? '#fff' : dHoje ? '#F97310' : '#374151' }}>{d.getDate()}</span>
+                                  </div>
+                                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: temEv ? '#F97310' : 'transparent' }} />
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div className="agenda-mobile" style={{ display: 'none' }}>
+                      {/* Header: mês/ano + novo evento + toggle */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                          <button onClick={() => setMobileDiaSel(d => { const n = new Date(d); n.setMonth(n.getMonth() - 1); return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: '#9ca3af', lineHeight: 1, padding: 0 }}>‹</button>
+                          <span style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', textTransform: 'capitalize', minWidth: '160px', textAlign: 'center' }}>{MESES_EXT[mobileDiaSel.getMonth()]} {mobileDiaSel.getFullYear()}</span>
+                          <button onClick={() => setMobileDiaSel(d => { const n = new Date(d); n.setMonth(n.getMonth() + 1); return n })} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: '#9ca3af', lineHeight: 1, padding: 0 }}>›</button>
+                        </div>
+                        <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '10px', padding: '3px', gap: '2px' }}>
+                          {[['semana','Semana'],['mes','Mês']].map(([v, l]) => (
+                            <button key={v} onClick={() => setAgendaView(v)} style={{ flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px', fontWeight: 700, background: agendaView === v ? '#fff' : 'transparent', color: agendaView === v ? '#F97310' : '#6b7280', boxShadow: agendaView === v ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>{l}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Grade de dias */}
+                      <div style={{ background: '#fff', borderRadius: '12px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '12px' }}>
+                        <DiasGrid />
+                      </div>
+                      <button onClick={() => { if (locais.length === 0) carregarLocais(); const d = `${mobileDiaSel.getFullYear()}-${String(mobileDiaSel.getMonth()+1).padStart(2,'0')}-${String(mobileDiaSel.getDate()).padStart(2,'0')}`; setFormEvento({ titulo: '', data: d, horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', organizacaoId: null }); setModalEvento({ tipo: 'novo', dia: mobileDiaSel }) }} style={{ ...s.editBtn, background: '#F97310', color: '#fff', width: '100%', textAlign: 'center', marginBottom: '16px' }}>+ Novo evento</button>
+
+                      {/* Eventos do dia selecionado */}
+                      <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                        <div style={{ fontSize: '15px', fontWeight: 900, color: ehHoje ? '#F97310' : '#0f1117', marginBottom: '16px', paddingBottom: '12px', borderBottom: '1.5px solid #f3f4f6' }}>
+                          {mobileDiaSel.getDate()} de {MESES_EXT[mobileDiaSel.getMonth()]}{ehHoje ? ' · Hoje' : ''}
+                        </div>
+                        {evsDia.length === 0 ? (
+                          <p style={{ fontSize: '14px', color: '#9ca3af', textAlign: 'center', padding: '16px 0', margin: 0 }}>Nenhum evento neste dia.</p>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {evsDia.map(ev => (
+                              <div key={ev.id} onClick={() => setModalEvento({ tipo: 'ver', evento: ev })} style={{ display: 'flex', gap: '12px', cursor: 'pointer', alignItems: 'flex-start' }}>
+                                <div style={{ width: '44px', flexShrink: 0 }}>
+                                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{ev.horaInicio}</div>
+                                  {ev.horaFim && <div style={{ fontSize: '11px', color: '#9ca3af' }}>{ev.horaFim}</div>}
+                                </div>
+                                <div style={{ flex: 1, display: 'flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid #f3f4f6' }}>
+                                  <div style={{ width: '4px', background: ev.cor || '#F97310', flexShrink: 0 }} />
+                                  <div style={{ flex: 1, padding: '8px 12px' }}>
+                                    <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f1117' }}>{ev.titulo}</div>
+                                    {ev.local && <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{ev.local}</div>}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Toolbar e calendário desktop */}
+                <div className="agenda-desktop">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button onClick={() => { if (locais.length === 0) carregarLocais(); const d = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`; setFormEvento({ titulo: '', data: d, horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', organizacaoId: null }); setModalEvento({ tipo: 'novo', dia: hoje }) }} style={{ ...s.editBtn, background: '#F97310', color: '#fff', fontSize: '13px', padding: '6px 16px' }}>+ Novo evento</button>
+                      <button onClick={irHoje} style={{ ...s.backBtn, fontSize: '13px', padding: '6px 16px' }}>Hoje</button>
+                      <button onClick={navAnterior} style={{ width: '32px', height: '32px', border: '1.5px solid #e5e7eb', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+                      <button onClick={navProximo} style={{ width: '32px', height: '32px', border: '1.5px solid #e5e7eb', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+                      <span style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginLeft: '4px' }}>{tituloNav()}</span>
+                    </div>
+                    <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: '10px', padding: '3px', gap: '2px' }}>
+                      {[['dia','Dia'],['semana','Semana'],['mes','Mês'],['agenda','Agenda']].map(([v, l]) => (
+                        <button key={v} onClick={() => setAgendaView(v)}
+                          style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px', fontWeight: 700, background: agendaView === v ? '#fff' : 'transparent', color: agendaView === v ? '#F97310' : '#6b7280', boxShadow: agendaView === v ? '0 1px 4px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {agendaView === 'mes' && renderMes()}
+                  {agendaView === 'semana' && renderSemana()}
+                  {agendaView === 'dia' && renderDia()}
+                  {agendaView === 'agenda' && renderAgenda()}
+                </div>
               </>
             )
           })()}

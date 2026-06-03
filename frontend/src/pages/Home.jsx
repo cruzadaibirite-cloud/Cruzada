@@ -11,6 +11,8 @@ export default function Home() {
   const [calMes, setCalMes] = useState(() => { const h = new Date(); return new Date(h.getFullYear(), h.getMonth(), 1) })
   const [calDiaSelecionado, setCalDiaSelecionado] = useState(null) // { diaObj, evsDia }
   const [calEventoAberto, setCalEventoAberto] = useState(null) // id do evento expandido
+  const [mobileDiaSel, setMobileDiaSel] = useState(new Date())
+  const [mobileView, setMobileView] = useState('semana')
 
   useEffect(() => {
     if (calDiaSelecionado) {
@@ -406,6 +408,13 @@ export default function Home() {
         .r.on { opacity: 1; transform: none; }
         .r2 { opacity: 0; transform: translateY(28px); transition: opacity .65s ease .15s, transform .65s ease .15s; }
         .r2.on { opacity: 1; transform: none; }
+        @media (max-width: 768px) {
+          .cal-desktop { display: none !important; }
+          .cal-mobile { display: block !important; }
+        }
+        @media (min-width: 769px) {
+          .cal-mobile { display: none !important; }
+        }
         @media (max-width: 900px) {
           nav { padding: 0 20px; }
           .nav-links, .nav-date { display: none; }
@@ -746,8 +755,114 @@ export default function Home() {
           </div>
         )}
 
-        {/* Calendário mensal */}
-        <div className="r2" style={{marginTop:'52px'}}>
+        {/* Vista mobile do calendário */}
+        {(() => {
+          const hoje = new Date()
+          const MESES_EXT = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']
+          const evsDia = eventos.filter(e => new Date(e.data+'T00:00:00').toDateString() === mobileDiaSel.toDateString()).sort((a,b) => (a.hora_inicio||'').localeCompare(b.hora_inicio||''))
+          const ehHoje = mobileDiaSel.toDateString() === hoje.toDateString()
+
+          function DiasGrid() {
+            const LETRAS = ['D','S','T','Q','Q','S','S']
+            let celulas = []
+            if (mobileView === 'semana') {
+              const ini = new Date(mobileDiaSel)
+              ini.setDate(ini.getDate() - ini.getDay())
+              celulas = Array.from({ length: 7 }, (_, i) => { const d = new Date(ini); d.setDate(d.getDate() + i); return d })
+            } else {
+              const mA = mobileDiaSel.getMonth()
+              const aA = mobileDiaSel.getFullYear()
+              const primeiroDia = new Date(aA, mA, 1).getDay()
+              const diasNoMes = new Date(aA, mA + 1, 0).getDate()
+              const total = Math.ceil((primeiroDia + diasNoMes) / 7) * 7
+              celulas = Array.from({ length: total }, (_, i) => {
+                const diaNum = i - primeiroDia + 1
+                return (diaNum >= 1 && diaNum <= diasNoMes) ? new Date(aA, mA, diaNum) : null
+              })
+            }
+            const rows = []
+            for (let i = 0; i < celulas.length; i += 7) rows.push(celulas.slice(i, i + 7))
+            return (
+              <div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:'4px'}}>
+                  {LETRAS.map((l,i) => <div key={i} style={{textAlign:'center',fontSize:'11px',fontWeight:700,color:'#9ca3af',padding:'4px 0'}}>{l}</div>)}
+                </div>
+                {rows.map((row, ri) => (
+                  <div key={ri} style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)'}}>
+                    {row.map((d, di) => {
+                      if (!d) return <div key={di} />
+                      const sel = d.toDateString() === mobileDiaSel.toDateString()
+                      const dHoje = d.toDateString() === hoje.toDateString()
+                      const temEv = eventos.some(e => new Date(e.data+'T00:00:00').toDateString() === d.toDateString())
+                      return (
+                        <div key={di} onClick={() => setMobileDiaSel(new Date(d))} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:'3px',cursor:'pointer',padding:'4px 0'}}>
+                          <div style={{width:'34px',height:'34px',borderRadius:'50%',background:sel?'#F97310':'transparent',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                            <span style={{fontSize:'15px',fontWeight:900,color:sel?'#fff':dHoje?'#F97310':'#374151'}}>{d.getDate()}</span>
+                          </div>
+                          <div style={{width:'5px',height:'5px',borderRadius:'50%',background:temEv?'#F97310':'transparent'}} />
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            )
+          }
+
+          return (
+            <div className="cal-mobile r2" style={{display:'none',marginTop:'52px'}}>
+              {/* Header */}
+              <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'12px'}}>
+                  <button onClick={() => setMobileDiaSel(d => { const n=new Date(d); n.setMonth(n.getMonth()-1); return n })} style={{background:'none',border:'none',cursor:'pointer',fontSize:'22px',color:'#9ca3af',lineHeight:1,padding:0}}>‹</button>
+                  <span style={{fontSize:'18px',fontWeight:900,color:'#0f1117',textTransform:'capitalize',minWidth:'160px',textAlign:'center'}}>{MESES_EXT[mobileDiaSel.getMonth()]} {mobileDiaSel.getFullYear()}</span>
+                  <button onClick={() => setMobileDiaSel(d => { const n=new Date(d); n.setMonth(n.getMonth()+1); return n })} style={{background:'none',border:'none',cursor:'pointer',fontSize:'22px',color:'#9ca3af',lineHeight:1,padding:0}}>›</button>
+                </div>
+                <div style={{display:'flex',background:'#f3f4f6',borderRadius:'10px',padding:'3px',gap:'2px'}}>
+                  {[['semana','Semana'],['mes','Mês']].map(([v,l]) => (
+                    <button key={v} onClick={() => setMobileView(v)} style={{flex:1,padding:'8px',borderRadius:'8px',border:'none',cursor:'pointer',fontFamily:'inherit',fontSize:'13px',fontWeight:700,background:mobileView===v?'#fff':'transparent',color:mobileView===v?'#F97310':'#6b7280',boxShadow:mobileView===v?'0 1px 4px rgba(0,0,0,0.1)':'none',transition:'all 0.15s'}}>{l}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Grade */}
+              <div style={{background:'#fff',borderRadius:'12px',padding:'12px',boxShadow:'0 2px 8px rgba(0,0,0,0.08)',marginBottom:'16px'}}>
+                <DiasGrid />
+              </div>
+
+              {/* Eventos do dia */}
+              <div style={{background:'#fff',borderRadius:'12px',padding:'16px',boxShadow:'0 2px 8px rgba(0,0,0,0.08)'}}>
+                <div style={{fontSize:'15px',fontWeight:900,color:ehHoje?'#F97310':'#0f1117',marginBottom:'16px',paddingBottom:'12px',borderBottom:'1.5px solid #f3f4f6'}}>
+                  {mobileDiaSel.getDate()} de {MESES_EXT[mobileDiaSel.getMonth()]}{ehHoje?' · Hoje':''}
+                </div>
+                {evsDia.length === 0 ? (
+                  <p style={{fontSize:'14px',color:'#9ca3af',textAlign:'center',padding:'16px 0',margin:0}}>Nenhum evento neste dia.</p>
+                ) : (
+                  <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
+                    {evsDia.map(ev => (
+                      <div key={ev.id} onClick={() => setCalDiaSelecionado({ diaObj: mobileDiaSel, evsDia, _abrir: ev.id })} style={{display:'flex',gap:'12px',cursor:'pointer',alignItems:'flex-start'}}>
+                        <div style={{width:'44px',flexShrink:0}}>
+                          <div style={{fontSize:'13px',fontWeight:700,color:'#374151'}}>{ev.hora_inicio?.slice(0,5)}</div>
+                          {ev.hora_fim && <div style={{fontSize:'11px',color:'#9ca3af'}}>{ev.hora_fim?.slice(0,5)}</div>}
+                        </div>
+                        <div style={{flex:1,display:'flex',borderRadius:'8px',overflow:'hidden',border:'1px solid #f3f4f6'}}>
+                          <div style={{width:'4px',background:ev.cor||'#F97310',flexShrink:0}} />
+                          <div style={{flex:1,padding:'8px 12px'}}>
+                            <div style={{fontSize:'14px',fontWeight:800,color:'#0f1117'}}>{ev.titulo}</div>
+                            {ev.local && <div style={{fontSize:'12px',color:'#6b7280',marginTop:'2px'}}>{ev.local}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* Calendário mensal — desktop */}
+        <div className="cal-desktop r2" style={{marginTop:'52px'}}>
           {/* Toolbar */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}}>
             <div style={{display:'flex',alignItems:'center',gap:'12px'}}>
