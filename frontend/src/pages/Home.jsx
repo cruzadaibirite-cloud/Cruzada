@@ -697,7 +697,7 @@ export default function Home() {
       <section className="sec-agenda" id="agenda">
         <div className="r">
           <span className="sec-eyebrow">Programação Oficial</span>
-          <h2 className="sec-h2">Nossa <span>Agenda</span> · 27 Jun a 05 Jul<span className="sec-h2-line"></span></h2>
+          <h2 className="sec-h2">Nossa <span>Agenda</span><span className="sec-h2-line"></span></h2>
         </div>
         {/* Modal dia */}
         {calDiaSelecionado && (
