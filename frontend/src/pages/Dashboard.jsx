@@ -75,6 +75,12 @@ export default function Dashboard() {
   const [formNovoUsuario, setFormNovoUsuario] = useState({ nome: '', email: '', senha: '', telefone: '', perfil: 'voluntario' })
   const [salvandoUsuario, setSalvandoUsuario] = useState(false)
   const [erroUsuario, setErroUsuario] = useState('')
+  const [selectedUsuario, setSelectedUsuario] = useState(null)
+  const [confirmDeleteUsuario, setConfirmDeleteUsuario] = useState(false)
+  const [deletandoUsuario, setDeletandoUsuario] = useState(false)
+  const [buscaVoluntario, setBuscaVoluntario] = useState('')
+  const [sugestoesVoluntario, setSugestoesVoluntario] = useState([])
+  const [usuarioOrgs, setUsuarioOrgs] = useState({ equipes: [], grupos: [] })
 
   // Agenda
   const hoje = new Date()
@@ -85,7 +91,9 @@ export default function Dashboard() {
   const [formEditEvento, setFormEditEvento] = useState({})
   const [buscaLocalEvento, setBuscaLocalEvento] = useState('')
   const [confirmarExclusao, setConfirmarExclusao] = useState(false)
-  const [formEvento, setFormEvento] = useState({ titulo: '', data: '', horaInicio: '', horaFim: '', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', organizacaoId: null })
+  const [formEvento, setFormEvento] = useState({ titulo: '', data: '', horaInicio: '', horaFim: '', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', equipeId: null })
+  const [equipes, setEquipes] = useState([])
+  const [grupos, setGrupos] = useState([])
   const [organizacoes, setOrganizacoes] = useState([])
   const [agendaDiaSelecionado, setAgendaDiaSelecionado] = useState(null) // { diaObj, evsDia }
   const [agendaDiaModal, setAgendaDiaModal] = useState(null) // modal da lista do dia
@@ -108,13 +116,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
-    if (menu === 'usuarios') carregarUsuarios()
+    if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'locais' || menu === 'agenda') carregarLocais()
-    if (menu === 'agenda') { carregarEventos(); carregarOrganizacoes() }
+    if (menu === 'agenda') { carregarEventos(); carregarEquipes() }
   }, [menu])
 
   async function carregarEventos() {
-    const { data } = await supabase.from('eventos').select('*, locais(nome), organizacao(nome)').order('data').order('hora_inicio')
+    const { data } = await supabase.from('eventos').select('*, locais(nome), equipes(nome)').order('data').order('hora_inicio')
     if (data) {
       setAgendaEventos(data.map(e => ({
         id: e.id,
@@ -125,17 +133,27 @@ export default function Dashboard() {
         hora: e.hora_inicio?.slice(0, 5),
         cor: e.cor || '#F97310',
         descricao: e.descricao || '',
-        local: e.locais?.nome || e.local || '',
+        local: e.locais?.nome || '',
         localId: e.local_id || null,
-        equipe: e.organizacao?.nome || e.equipe || '',
-        organizacaoId: e.organizacao_id || null,
+        equipe: e.equipes?.nome || '',
+        equipeId: e.equipe_id || null,
       })))
     }
   }
 
-  async function carregarOrganizacoes() {
-    const { data } = await supabase.from('organizacao').select('*').order('nome')
+  async function carregarEquipes() {
+    const { data } = await supabase.from('equipes').select('*').order('nome')
+    setEquipes(data || [])
     setOrganizacoes(data || [])
+  }
+
+  async function carregarGrupos() {
+    const { data } = await supabase.from('grupos').select('*').order('nome')
+    setGrupos(data || [])
+  }
+
+  async function carregarOrganizacoes() {
+    await carregarEquipes()
   }
 
   async function carregarLocais() {
@@ -234,6 +252,61 @@ export default function Dashboard() {
     setSalvandoUsuario(false)
     setModalNovoUsuario(false)
     setFormNovoUsuario({ nome: '', email: '', senha: '', telefone: '', perfil: 'voluntario' })
+    carregarUsuarios()
+  }
+
+  async function carregarOrgsUsuario(uid) {
+    const [{ data: eqs }, { data: grs }] = await Promise.all([
+      supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', uid),
+      supabase.from('usuario_grupos').select('grupo_id').eq('usuario_id', uid),
+    ])
+    setUsuarioOrgs({
+      equipes: (eqs || []).map(r => r.equipe_id),
+      grupos: (grs || []).map(r => r.grupo_id),
+    })
+  }
+
+  async function toggleEquipeUsuario(uid, id, ativo) {
+    if (ativo) {
+      await supabase.from('usuario_equipes').delete().eq('usuario_id', uid).eq('equipe_id', id)
+      setUsuarioOrgs(prev => ({ ...prev, equipes: prev.equipes.filter(x => x !== id) }))
+    } else {
+      await supabase.from('usuario_equipes').insert({ usuario_id: uid, equipe_id: id })
+      setUsuarioOrgs(prev => ({ ...prev, equipes: [...prev.equipes, id] }))
+    }
+  }
+
+  async function toggleGrupoUsuario(uid, id, ativo) {
+    if (ativo) {
+      await supabase.from('usuario_grupos').delete().eq('usuario_id', uid).eq('grupo_id', id)
+      setUsuarioOrgs(prev => ({ ...prev, grupos: prev.grupos.filter(x => x !== id) }))
+    } else {
+      await supabase.from('usuario_grupos').insert({ usuario_id: uid, grupo_id: id })
+      setUsuarioOrgs(prev => ({ ...prev, grupos: [...prev.grupos, id] }))
+    }
+  }
+
+  async function buscarVoluntariosParaVinculo(texto) {
+    setBuscaVoluntario(texto)
+    if (texto.length < 2) { setSugestoesVoluntario([]); return }
+    const { data } = await supabase.from('voluntarios').select('id, nome_completo').ilike('nome_completo', `%${texto}%`).limit(8)
+    setSugestoesVoluntario(data || [])
+  }
+
+  async function ativarUsuario(u) {
+    const novoAtivo = !u.ativo
+    await supabase.from('usuarios').update({ ativo: novoAtivo }).eq('id', u.id)
+    setSelectedUsuario(v => ({ ...v, ativo: novoAtivo }))
+    setUsuarios(list => list.map(x => x.id === u.id ? { ...x, ativo: novoAtivo } : x))
+  }
+
+  async function deletarUsuario(uid) {
+    setDeletandoUsuario(true)
+    await supabase.from('usuarios').delete().eq('id', uid)
+    await supabase.auth.admin.deleteUser(uid)
+    setDeletandoUsuario(false)
+    setSelectedUsuario(null)
+    setConfirmDeleteUsuario(false)
     carregarUsuarios()
   }
 
@@ -935,7 +1008,7 @@ export default function Dashboard() {
             }
             function abrirNovoEvento(dia) {
               if (locais.length === 0) carregarLocais()
-              setFormEvento({ titulo: '', data: toInputDate(dia), horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', organizacaoId: null })
+              setFormEvento({ titulo: '', data: toInputDate(dia), horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', equipeId: null })
               setModalEvento({ tipo: 'novo', dia })
             }
             async function salvarEvento() {
@@ -948,11 +1021,11 @@ export default function Dashboard() {
                 cor: formEvento.cor,
                 descricao: formEvento.descricao || null,
                 local_id: formEvento.localId || null,
-                organizacao_id: formEvento.organizacaoId || null,
+                equipe_id: formEvento.equipeId || null,
               }
-              const { data, error } = await supabase.from('eventos').insert(payload).select('*, locais(nome), organizacao(nome)').single()
+              const { data, error } = await supabase.from('eventos').insert(payload).select('*, locais(nome), equipes(nome)').single()
               if (!error && data) {
-                const novo = { id: data.id, titulo: data.titulo, data: new Date(data.data + 'T00:00:00'), horaInicio: data.hora_inicio?.slice(0,5), horaFim: data.hora_fim?.slice(0,5), hora: data.hora_inicio?.slice(0,5), cor: data.cor, descricao: data.descricao || '', local: data.locais?.nome || '', localId: data.local_id, equipe: data.organizacao?.nome || '', organizacaoId: data.organizacao_id }
+                const novo = { id: data.id, titulo: data.titulo, data: new Date(data.data + 'T00:00:00'), horaInicio: data.hora_inicio?.slice(0,5), horaFim: data.hora_fim?.slice(0,5), hora: data.hora_inicio?.slice(0,5), cor: data.cor, descricao: data.descricao || '', local: data.locais?.nome || '', localId: data.local_id, equipe: data.equipes?.nome || '', equipeId: data.equipe_id }
                 setAgendaEventos(ev => [...ev, novo])
               }
               setModalEvento(null)
@@ -1286,17 +1359,16 @@ export default function Dashboard() {
                               </div>
                               <div style={{ position: 'relative' }}>
                                 <label style={s.fieldLabel}>Organização</label>
-                                <input style={s.inputEdit} value={formEvento.equipe} onChange={e => setFormEvento(f => ({ ...f, equipe: e.target.value, organizacaoId: null }))} placeholder="Pesquisar organização..." autoComplete="off" />
-                                {formEvento.equipe.length > 0 && !formEvento.organizacaoId && organizacoes.filter(o => o.nome.toLowerCase().includes(formEvento.equipe.toLowerCase())).length > 0 && (
+                                <input style={s.inputEdit} value={formEvento.equipe} onChange={e => setFormEvento(f => ({ ...f, equipe: e.target.value, equipeId: null }))} placeholder="Pesquisar equipe..." autoComplete="off" />
+                                {formEvento.equipe.length > 0 && !formEvento.equipeId && equipes.filter(o => o.nome.toLowerCase().includes(formEvento.equipe.toLowerCase())).length > 0 && (
                                   <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
-                                    {organizacoes.filter(o => o.nome.toLowerCase().includes(formEvento.equipe.toLowerCase())).slice(0, 8).map(o => (
+                                    {equipes.filter(o => o.nome.toLowerCase().includes(formEvento.equipe.toLowerCase())).slice(0, 8).map(o => (
                                       <div key={o.id}
                                         style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
                                         onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
                                         onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                                        onClick={() => setFormEvento(f => ({ ...f, equipe: o.nome, organizacaoId: o.id }))}>
+                                        onClick={() => setFormEvento(f => ({ ...f, equipe: o.nome, equipeId: o.id }))}>
                                         <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{o.nome}</div>
-                                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>{o.tipo}</div>
                                       </div>
                                     ))}
                                   </div>
@@ -1364,17 +1436,16 @@ export default function Dashboard() {
                               </div>
                               <div style={{ position: 'relative' }}>
                                 <label style={s.fieldLabel}>Organização</label>
-                                <input style={s.inputEdit} value={formEditEvento.equipe || ''} onChange={e => setFormEditEvento(f => ({ ...f, equipe: e.target.value, organizacaoId: null }))} placeholder="Pesquisar organização..." autoComplete="off" />
-                                {(formEditEvento.equipe || '').length > 0 && !formEditEvento.organizacaoId && organizacoes.filter(o => o.nome.toLowerCase().includes((formEditEvento.equipe || '').toLowerCase())).length > 0 && (
+                                <input style={s.inputEdit} value={formEditEvento.equipe || ''} onChange={e => setFormEditEvento(f => ({ ...f, equipe: e.target.value, equipeId: null }))} placeholder="Pesquisar equipe..." autoComplete="off" />
+                                {(formEditEvento.equipe || '').length > 0 && !formEditEvento.equipeId && equipes.filter(o => o.nome.toLowerCase().includes((formEditEvento.equipe || '').toLowerCase())).length > 0 && (
                                   <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
-                                    {organizacoes.filter(o => o.nome.toLowerCase().includes((formEditEvento.equipe || '').toLowerCase())).slice(0, 8).map(o => (
+                                    {equipes.filter(o => o.nome.toLowerCase().includes((formEditEvento.equipe || '').toLowerCase())).slice(0, 8).map(o => (
                                       <div key={o.id}
                                         style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
                                         onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
                                         onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                                        onClick={() => setFormEditEvento(f => ({ ...f, equipe: o.nome, organizacaoId: o.id }))}>
+                                        onClick={() => setFormEditEvento(f => ({ ...f, equipe: o.nome, equipeId: o.id }))}>
                                         <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{o.nome}</div>
-                                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>{o.tipo}</div>
                                       </div>
                                     ))}
                                   </div>
@@ -1406,7 +1477,7 @@ export default function Dashboard() {
                                   cor: formEditEvento.cor,
                                   descricao: formEditEvento.descricao || null,
                                   local_id: formEditEvento.localId || null,
-                                  organizacao_id: formEditEvento.organizacaoId || null,
+                                  equipe_id: formEditEvento.equipeId || null,
                                 }
                                 const { error } = await supabase.from('eventos').update(payload).eq('id', modalEvento.evento.id)
                                 if (!error) {
@@ -1476,7 +1547,7 @@ export default function Dashboard() {
                               <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => {
                                 const ev = modalEvento.evento
                                 const d = ev.data
-                                setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', organizacaoId: ev.organizacaoId || null })
+                                setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', equipeId: ev.equipeId || null })
                                 setModalEvento({ tipo: 'editar', evento: ev })
                               }}>Editar</button>
                               <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => setConfirmarExclusao(true)}>Excluir</button>
@@ -1750,9 +1821,127 @@ export default function Dashboard() {
 
               {loadingUsers && <p style={s.info}>Carregando...</p>}
               {!loadingUsers && usuarios.length === 0 && <p style={s.info}>Nenhum usuário cadastrado.</p>}
+              {selectedUsuario && (
+                <div style={s.modalOverlay} onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]) }}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]) }} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151' }}>✕</button>
+
+                    {/* Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
+                      <div style={{ ...s.cardAvatar, width: '52px', height: '52px', fontSize: '22px', borderRadius: '50%', flexShrink: 0 }}>{selectedUsuario.nome?.[0]?.toUpperCase()}</div>
+                      <div>
+                        <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f1117' }}>{selectedUsuario.nome}</div>
+                        <div style={{ fontSize: '13px', color: '#6b7280' }}>{selectedUsuario.email}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: selectedUsuario.ativo ? '#16a34a' : '#dc2626', background: selectedUsuario.ativo ? '#dcfce7' : '#fee2e2', borderRadius: '20px', padding: '2px 10px' }}>
+                            {selectedUsuario.ativo ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!confirmDeleteUsuario ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+                        {/* Ativar/Desativar */}
+                        <button onClick={() => ativarUsuario(selectedUsuario)} style={{ width: '100%', background: selectedUsuario.ativo ? '#f3f4f6' : '#dcfce7', color: selectedUsuario.ativo ? '#374151' : '#16a34a', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                          {selectedUsuario.ativo ? 'Desativar acesso' : 'Ativar acesso'}
+                        </button>
+
+                        {/* Editar campos */}
+                        <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>Editar</div>
+
+                          <div>
+                            <label style={s.fieldLabel}>Perfil</label>
+                            <select style={s.inputEdit} value={selectedUsuario.perfil || ''} onChange={async e => {
+                              const perfil = e.target.value
+                              await supabase.from('usuarios').update({ perfil }).eq('id', selectedUsuario.id)
+                              setSelectedUsuario(v => ({ ...v, perfil }))
+                              setUsuarios(list => list.map(x => x.id === selectedUsuario.id ? { ...x, perfil } : x))
+                            }}>
+                              <option value="admin">Admin</option>
+                              <option value="lider">Líder</option>
+                              <option value="voluntario">Voluntário</option>
+                              <option value="igreja">Igreja</option>
+                              <option value="prefeitura">Prefeitura</option>
+                            </select>
+                          </div>
+
+                          <EquipeRadio
+                            itens={equipes}
+                            selecionado={usuarioOrgs.equipes[0] || null}
+                            onSelect={async (id) => {
+                              await supabase.from('usuario_equipes').delete().eq('usuario_id', selectedUsuario.id)
+                              if (id) await supabase.from('usuario_equipes').insert({ usuario_id: selectedUsuario.id, equipe_id: id })
+                              setUsuarioOrgs(prev => ({ ...prev, equipes: id ? [id] : [] }))
+                            }}
+                            fieldLabel={s.fieldLabel}
+                          />
+                          <EquipeGrupoCheckbox
+                            label="Grupos"
+                            itens={grupos}
+                            marcados={usuarioOrgs.grupos}
+                            onToggle={(id, marcado) => toggleGrupoUsuario(selectedUsuario.id, id, marcado)}
+                            fieldLabel={s.fieldLabel}
+                          />
+
+                          <div style={{ position: 'relative' }}>
+                            <label style={s.fieldLabel}>Vincular voluntário</label>
+                            <input
+                              style={s.inputEdit}
+                              placeholder="Buscar pelo nome..."
+                              value={buscaVoluntario}
+                              onChange={e => buscarVoluntariosParaVinculo(e.target.value)}
+                              onBlur={() => setTimeout(() => setSugestoesVoluntario([]), 200)}
+                              autoComplete="off"
+                            />
+                            {selectedUsuario.voluntario_id && !buscaVoluntario && (
+                              <span style={{ fontSize: '12px', color: '#22c55e', fontWeight: 700, marginTop: '4px', display: 'block' }}>✓ já vinculado</span>
+                            )}
+                            {sugestoesVoluntario.length > 0 && (
+                              <ul style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 200, listStyle: 'none', margin: '4px 0 0', padding: 0, overflow: 'hidden' }}>
+                                {sugestoesVoluntario.map(vol => (
+                                  <li key={vol.id} onMouseDown={async () => {
+                                    await supabase.from('usuarios').update({ voluntario_id: vol.id }).eq('id', selectedUsuario.id)
+                                    setSelectedUsuario(v => ({ ...v, voluntario_id: vol.id }))
+                                    setUsuarios(list => list.map(x => x.id === selectedUsuario.id ? { ...x, voluntario_id: vol.id } : x))
+                                    setBuscaVoluntario('')
+                                    setSugestoesVoluntario([])
+                                  }} style={{ padding: '9px 14px', fontSize: '13px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', color: '#1a1d27' }}>
+                                    {vol.nome_completo}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Excluir */}
+                        <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
+                          <button onClick={() => setConfirmDeleteUsuario(true)} style={{ width: '100%', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            Excluir usuário
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ textAlign: 'center' }}>
+                        <p style={{ fontSize: '14px', color: '#374151', marginBottom: '16px' }}>Tem certeza? Esta ação não pode ser desfeita.</p>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button onClick={() => setConfirmDeleteUsuario(false)} style={{ flex: 1, background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                          <button onClick={() => deletarUsuario(selectedUsuario.id)} disabled={deletandoUsuario} style={{ flex: 1, background: '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            {deletandoUsuario ? 'Excluindo...' : 'Confirmar exclusão'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div style={s.cards}>
                 {usuarios.map(u => (
-                  <div key={u.id} style={s.card}>
+                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={() => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos() }}>
                     <div style={s.cardAvatar}>{u.nome?.[0]?.toUpperCase()}</div>
                     <div style={s.cardInfo}>
                       <div style={s.cardNome}>{u.nome}</div>
@@ -1824,6 +2013,75 @@ export default function Dashboard() {
         </div>
       </div>
 
+    </div>
+  )
+}
+
+function EquipeRadio({ itens, selecionado, onSelect, fieldLabel }) {
+  const [busca, setBusca] = useState('')
+  const [aberto, setAberto] = useState(false)
+  const filtrados = itens.filter(o => o.nome.toLowerCase().includes(busca.toLowerCase()))
+  const nomeSelecionado = itens.find(o => o.id === selecionado)?.nome
+  return (
+    <div style={{ marginBottom: '4px', position: 'relative' }}>
+      <label style={fieldLabel}>Equipe</label>
+      <input
+        type="text"
+        value={busca}
+        onChange={e => { setBusca(e.target.value); setAberto(e.target.value.length > 0) }}
+        onBlur={() => setTimeout(() => { setAberto(false); setBusca('') }, 200)}
+        placeholder={nomeSelecionado || 'Buscar equipe...'}
+        autoComplete="off"
+        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: '#1a1d27', outline: 'none', boxSizing: 'border-box', marginTop: '6px' }}
+      />
+      {aberto && filtrados.length > 0 && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 300, overflow: 'hidden' }}>
+          <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+            {filtrados.map(o => (
+              <label key={o.id} onMouseDown={e => e.preventDefault()} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', cursor: 'pointer', fontSize: '14px', color: '#374151', fontWeight: selecionado === o.id ? 700 : 400, borderBottom: '1px solid #f3f4f6' }}>
+                <input type="radio" name="equipe_radio" checked={selecionado === o.id} onChange={() => onSelect(o.id)} style={{ accentColor: '#F97310', width: '16px', height: '16px' }} />
+                {o.nome}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EquipeGrupoCheckbox({ label, itens, marcados, onToggle, fieldLabel }) {
+  const [busca, setBusca] = useState('')
+  const [aberto, setAberto] = useState(false)
+  const filtrados = itens.filter(o => o.nome.toLowerCase().includes(busca.toLowerCase()))
+  const selecionados = itens.filter(o => marcados.includes(o.id))
+  return (
+    <div style={{ marginBottom: '4px', position: 'relative' }}>
+      <label style={fieldLabel}>{label}{selecionados.length > 0 && <span style={{ color: '#F97310', marginLeft: '6px', fontWeight: 700 }}>({selecionados.length})</span>}</label>
+      <input
+        type="text"
+        value={busca}
+        onChange={e => { setBusca(e.target.value); setAberto(e.target.value.length > 0) }}
+        onBlur={() => setTimeout(() => { setAberto(false); setBusca('') }, 200)}
+        placeholder={selecionados.length ? selecionados.map(o => o.nome).join(', ') : `Buscar ${label.toLowerCase()}...`}
+        autoComplete="off"
+        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: '#1a1d27', outline: 'none', boxSizing: 'border-box', marginTop: '6px' }}
+      />
+      {aberto && filtrados.length > 0 && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 300, overflow: 'hidden' }}>
+          <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
+            {filtrados.map(o => {
+              const marcado = marcados.includes(o.id)
+              return (
+                <label key={o.id} onMouseDown={e => e.preventDefault()} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', cursor: 'pointer', fontSize: '14px', color: '#374151', fontWeight: marcado ? 700 : 400, borderBottom: '1px solid #f3f4f6' }}>
+                  <input type="checkbox" checked={marcado} onChange={() => onToggle(o.id, marcado)} style={{ accentColor: '#F97310', width: '16px', height: '16px' }} />
+                  {o.nome}
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

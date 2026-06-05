@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
 const mobileStyle = `
   @media (max-width: 768px) {
@@ -40,9 +41,19 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showForgot, setShowForgot] = useState(false)
+  const [showRegister, setShowRegister] = useState(false)
   const [showEncerrado, setShowEncerrado] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotMsg, setForgotMsg] = useState('')
+  const [regNome, setRegNome] = useState('')
+  const [regSobrenome, setRegSobrenome] = useState('')
+  const [regEmail, setRegEmail] = useState('')
+  const [regTelefone, setRegTelefone] = useState('')
+  const [regSenha, setRegSenha] = useState('')
+  const [regConfirm, setRegConfirm] = useState('')
+  const [regError, setRegError] = useState('')
+  const [regSuccess, setRegSuccess] = useState(false)
+  const [regLoading, setRegLoading] = useState(false)
   const [verseIdx, setVerseIdx] = useState(0)
   const [fade, setFade] = useState(true)
   const { signIn } = useAuth()
@@ -63,8 +74,12 @@ export default function Login() {
     try {
       await signIn(email, password)
       navigate('/sistema')
-    } catch {
-      setError('E-mail ou senha incorretos.')
+    } catch (err) {
+      if (err.message === 'inactive') {
+        setError('Sua conta ainda não foi ativada. Aguarde a aprovação do administrador.')
+      } else {
+        setError('E-mail ou senha incorretos.')
+      }
     } finally {
       setLoading(false)
     }
@@ -73,6 +88,44 @@ export default function Login() {
   async function handleForgot(e) {
     e.preventDefault()
     setForgotMsg('Se este e-mail estiver cadastrado, você receberá as instruções em breve.')
+  }
+
+  async function handleRegister(e) {
+    e.preventDefault()
+    setRegError('')
+    if (regSenha !== regConfirm) { setRegError('As senhas não coincidem.'); return }
+    if (regSenha.length < 6) { setRegError('A senha deve ter pelo menos 6 caracteres.'); return }
+    setRegLoading(true)
+    const nomeCompleto = `${regNome.trim()} ${regSobrenome.trim()}`.trim()
+    let data, error
+    try {
+      ;({ data, error } = await supabase.auth.signUp({ email: regEmail, password: regSenha, options: { data: { nome: nomeCompleto } } }))
+    } catch {
+      setRegError('Sem conexão. Verifique sua internet e tente novamente.')
+      setRegLoading(false)
+      return
+    }
+    if (error) {
+      if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
+        setRegError('E-mail já cadastrado.')
+      } else if (error.message.toLowerCase().includes('fetch') || error.message.toLowerCase().includes('network')) {
+        setRegError('Sem conexão. Verifique sua internet e tente novamente.')
+      } else {
+        setRegError(error.message)
+      }
+      setRegLoading(false)
+      return
+    }
+    const uid = data.user?.id
+    if (uid) {
+      await supabase.from('usuarios').insert({ id: uid, nome: nomeCompleto, email: regEmail, telefone: regTelefone || null, perfil: 'voluntario', ativo: false })
+    }
+    setRegLoading(false)
+    if (data.session) {
+      navigate('/sistema')
+    } else {
+      setRegSuccess(true)
+    }
   }
 
   const verse = VERSES[verseIdx]
@@ -131,9 +184,72 @@ export default function Login() {
       <div style={s.right} className="login-right">
         <div style={s.rightInner} className="login-right-inner">
 
-          {/* Logo visível só no mobile */}
+          {showRegister ? (
+            <>
+              <div style={{ marginBottom: '28px', textAlign: 'center' }}>
+                <div style={s.formTopIcon}>
+                  <img src="/icon-512.png" alt="Logo" style={{ height: '72px', width: 'auto' }} />
+                </div>
+                <h1 style={{ ...s.formTitle, marginBottom: '6px' }} className="login-form-title">Criar conta</h1>
+                <p style={s.formSub} className="login-form-sub">Preencha os dados para criar seu acesso</p>
+              </div>
 
-          {!showForgot ? (
+              {regSuccess ? (
+                <div style={s.success}>Conta criada! Você já pode entrar.</div>
+              ) : (
+                <form onSubmit={handleRegister} style={{ ...s.form, gap: '14px' }} autoComplete="off">
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ ...s.field, flex: 1 }}>
+                      <label style={s.label} className="login-label">Nome</label>
+                      <div style={s.inputWrap} className="login-input-wrap">
+                        <input type="text" required autoComplete="off" value={regNome} onChange={e => setRegNome(e.target.value)} placeholder="Nome" style={{...s.input, padding:'11px 14px'}} onFocus={e => e.target.parentNode.style.borderColor='#F97310'} onBlur={e => e.target.parentNode.style.borderColor='#e5e7eb'} />
+                      </div>
+                    </div>
+                    <div style={{ ...s.field, flex: 1 }}>
+                      <label style={s.label} className="login-label">Sobrenome</label>
+                      <div style={s.inputWrap} className="login-input-wrap">
+                        <input type="text" required autoComplete="off" value={regSobrenome} onChange={e => setRegSobrenome(e.target.value)} placeholder="Sobrenome" style={{...s.input, padding:'11px 14px'}} onFocus={e => e.target.parentNode.style.borderColor='#F97310'} onBlur={e => e.target.parentNode.style.borderColor='#e5e7eb'} />
+                      </div>
+                    </div>
+                  </div>
+                  <div style={s.field}>
+                    <label style={s.label} className="login-label">E-mail</label>
+                    <div style={s.inputWrap} className="login-input-wrap">
+                      <input type="email" required autoComplete="off" value={regEmail} onChange={e => setRegEmail(e.target.value)} placeholder="seu@email.com" style={{...s.input, padding:'11px 14px'}} onFocus={e => e.target.parentNode.style.borderColor='#F97310'} onBlur={e => e.target.parentNode.style.borderColor='#e5e7eb'} />
+                    </div>
+                  </div>
+                  <div style={s.field}>
+                    <label style={s.label} className="login-label">Telefone</label>
+                    <div style={s.inputWrap} className="login-input-wrap">
+                      <input type="tel" value={regTelefone} onChange={e => setRegTelefone(e.target.value)} placeholder="(31) 99999-9999" style={{...s.input, padding:'11px 14px'}} onFocus={e => e.target.parentNode.style.borderColor='#F97310'} onBlur={e => e.target.parentNode.style.borderColor='#e5e7eb'} />
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ ...s.field, flex: 1 }}>
+                      <label style={s.label} className="login-label">Senha</label>
+                      <div style={s.inputWrap} className="login-input-wrap">
+                        <input type="password" required autoComplete="new-password" value={regSenha} onChange={e => setRegSenha(e.target.value)} placeholder="Mínimo 6 caracteres" style={{...s.input, padding:'11px 14px'}} onFocus={e => e.target.parentNode.style.borderColor='#F97310'} onBlur={e => e.target.parentNode.style.borderColor='#e5e7eb'} />
+                      </div>
+                    </div>
+                    <div style={{ ...s.field, flex: 1 }}>
+                      <label style={s.label} className="login-label">Confirmar senha</label>
+                      <div style={s.inputWrap} className="login-input-wrap">
+                        <input type="password" required autoComplete="new-password" value={regConfirm} onChange={e => setRegConfirm(e.target.value)} placeholder="Repita a senha" style={{...s.input, padding:'11px 14px'}} onFocus={e => e.target.parentNode.style.borderColor='#F97310'} onBlur={e => e.target.parentNode.style.borderColor='#e5e7eb'} />
+                      </div>
+                    </div>
+                  </div>
+                  {regError && <p style={s.error}>{regError}</p>}
+                  <button type="submit" disabled={regLoading} style={{...s.btn, opacity: regLoading ? 0.75 : 1}}>
+                    <span>{regLoading ? 'Criando conta...' : 'Criar conta'}</span>
+                  </button>
+                </form>
+              )}
+
+              <button onClick={() => { setShowRegister(false); setRegError(''); setRegSuccess(false) }} style={s.backLoginBtn}>
+                ← Voltar ao login
+              </button>
+            </>
+          ) : !showForgot ? (
             <>
               <div style={s.formTop}>
                 <div style={s.formTopIcon}>
@@ -191,7 +307,7 @@ export default function Login() {
                 <div style={s.orLine}/><span style={s.orText}>não tem acesso?</span><div style={s.orLine}/>
               </div>
 
-              <button onClick={() => setShowEncerrado(true)} style={{...s.btnOutline, background:'none', cursor:'pointer', fontFamily:"'Nunito', sans-serif", width:'100%'}}>Quero fazer parte</button>
+              <button onClick={() => setShowRegister(true)} style={{...s.btnOutline, background:'none', cursor:'pointer', fontFamily:"'Nunito', sans-serif", width:'100%'}}>Criar conta</button>
 
               <a href="/" style={s.backLink} className="login-back-link">← Voltar ao site</a>
             </>

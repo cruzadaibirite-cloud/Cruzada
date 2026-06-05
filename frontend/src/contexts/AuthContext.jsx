@@ -27,6 +27,11 @@ export function AuthProvider({ children }) {
   async function signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
+    const { data: perfil } = await supabase.from('usuarios').select('ativo').eq('id', data.user.id).single()
+    if (perfil && perfil.ativo === false) {
+      await supabase.auth.signOut()
+      throw new Error('inactive')
+    }
     return data
   }
 
