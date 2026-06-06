@@ -2314,7 +2314,6 @@ export default function Dashboard() {
             <>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                 <h2 style={{ ...s.pageTitle, marginBottom: 0 }}>Usuários</h2>
-                <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={() => setModalNovoUsuario(true)}>+ Adicionar</button>
               </div>
 
               {modalNovoUsuario && (

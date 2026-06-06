@@ -121,11 +121,7 @@ export default function Login() {
       await supabase.from('usuarios').insert({ id: uid, nome: nomeCompleto, email: regEmail, telefone: regTelefone || null, perfil: 'voluntario', ativo: false })
     }
     setRegLoading(false)
-    if (data.session) {
-      navigate('/sistema')
-    } else {
-      setRegSuccess(true)
-    }
+    setRegSuccess(true)
   }
 
   const verse = VERSES[verseIdx]
@@ -188,7 +184,7 @@ export default function Login() {
             <>
               <div style={{ marginBottom: '28px', textAlign: 'center' }}>
                 <div style={s.formTopIcon}>
-                  <img src="/icon-512.png" alt="Logo" style={{ height: '72px', width: 'auto' }} />
+                  <img src="/icon-512.png" alt="Logo" style={{ height: '36px', width: 'auto' }} />
                 </div>
                 <h1 style={{ ...s.formTitle, marginBottom: '6px' }} className="login-form-title">Criar conta</h1>
                 <p style={s.formSub} className="login-form-sub">Preencha os dados para criar seu acesso</p>
