@@ -474,7 +474,7 @@ export default function Home() {
 
       <nav>
         <a href="#" className="nav-logo">
-          <img src="/logo1.png" alt="Logo" style={{height:'38px', width:'auto'}} />
+          <img src="/icon-512.png" alt="Logo" style={{height:'38px', width:'auto'}} />
           <span className="nav-logo-text">Cruzada <span>Ibirité</span></span>
         </a>
         <ul className="nav-links">

@@ -61,6 +61,7 @@ export default function Dashboard() {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [nomeUsuario, setNomeUsuario] = useState('')
+  const [perfilUsuario, setPerfilUsuario] = useState('')
   const [editandoStatus, setEditandoStatus] = useState(false)
   const [alertaCampos, setAlertaCampos] = useState(null)
   const [editando, setEditando] = useState(false)
@@ -80,7 +81,11 @@ export default function Dashboard() {
   const [erroUsuario, setErroUsuario] = useState('')
   const [selectedUsuario, setSelectedUsuario] = useState(null)
   const [confirmDeleteUsuario, setConfirmDeleteUsuario] = useState(false)
+  const [erroEquipeObrigatoria, setErroEquipeObrigatoria] = useState(false)
   const [deletandoUsuario, setDeletandoUsuario] = useState(false)
+  const [editandoUsuario, setEditandoUsuario] = useState(false)
+  const [formEditUsuario, setFormEditUsuario] = useState({})
+  const [salvandoEdicaoUsuario, setSalvandoEdicaoUsuario] = useState(false)
   const [buscaVoluntario, setBuscaVoluntario] = useState('')
   const [sugestoesVoluntario, setSugestoesVoluntario] = useState([])
   const [usuarioOrgs, setUsuarioOrgs] = useState({ equipes: [], grupos: [] })
@@ -108,7 +113,7 @@ export default function Dashboard() {
   const [loadingEvang, setLoadingEvang] = useState(false)
   const [modalAbordagem, setModalAbordagem] = useState(false)
   const [salvandoAbordagem, setSalvandoAbordagem] = useState(false)
-  const [formAbordagem, setFormAbordagem] = useState({ local: '', endereco: '', data_hora: '', observacao: '' })
+  const [formAbordagem, setFormAbordagem] = useState({ local: '', endereco: '', data_hora: '', observacao: '', equipe_id: '' })
   const [pessoas, setPessoas] = useState([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '' }])
   const [abordagemSelecionada, setAbordagemSelecionada] = useState(null)
   const [evangelizados, setEvangelizados] = useState([])
@@ -124,14 +129,18 @@ export default function Dashboard() {
   const [editandoEvangelizado, setEditandoEvangelizado] = useState(null)
   const [formEditEvangelizado, setFormEditEvangelizado] = useState({})
   const [salvandoEvangelizado, setSalvandoEvangelizado] = useState(false)
+  const [adicionandoPessoa, setAdicionandoPessoa] = useState(false)
+  const [formNovaPessoa, setFormNovaPessoa] = useState({ nome: '', telefone: '', endereco_pessoa: '', observacao: '' })
+  const [salvandoNovaPessoa, setSalvandoNovaPessoa] = useState(false)
   const [editandoAbordagem, setEditandoAbordagem] = useState(false)
   const [formEditAbordagem, setFormEditAbordagem] = useState({})
   const [salvandoEditAbordagem, setSalvandoEditAbordagem] = useState(false)
 
   useEffect(() => {
     async function carregarNome() {
-      const { data } = await supabase.from('usuarios').select('nome').eq('id', user?.id).single()
+      const { data } = await supabase.from('usuarios').select('nome, perfil').eq('id', user?.id).single()
       if (data?.nome) setNomeUsuario(data.nome)
+      if (data?.perfil) setPerfilUsuario(data.perfil)
     }
     if (user?.id) carregarNome()
   }, [user])
@@ -147,7 +156,7 @@ export default function Dashboard() {
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'locais' || menu === 'agenda') carregarLocais()
     if (menu === 'agenda') { carregarEventos(); carregarEquipes() }
-    if (menu === 'evangelismo') carregarAbordagens()
+    if (menu === 'evangelismo') { carregarAbordagens(); carregarEquipes(); if (user?.id) carregarOrgsUsuario(user.id) }
     if (menu === 'mapa') carregarAbordagensComTotal()
   }, [menu])
 
@@ -290,10 +299,11 @@ export default function Dashboard() {
       supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', uid),
       supabase.from('usuario_grupos').select('grupo_id').eq('usuario_id', uid),
     ])
-    setUsuarioOrgs({
-      equipes: (eqs || []).map(r => r.equipe_id),
-      grupos: (grs || []).map(r => r.grupo_id),
-    })
+    const equipes = (eqs || []).map(r => r.equipe_id)
+    const grupos = (grs || []).map(r => r.grupo_id)
+    setUsuarioOrgs({ equipes, grupos })
+    setFormEditUsuario(f => ({ ...f, equipe_id: equipes[0] || '' }))
+    return { equipes, grupos }
   }
 
   async function toggleEquipeUsuario(uid, id, ativo) {
@@ -325,9 +335,29 @@ export default function Dashboard() {
 
   async function ativarUsuario(u) {
     const novoAtivo = !u.ativo
+    const temEquipe = usuarioOrgs.equipes.length > 0 || !!formEditUsuario.equipe_id
+    if (novoAtivo && !temEquipe) {
+      setErroEquipeObrigatoria(true)
+      return
+    }
+    setErroEquipeObrigatoria(false)
     await supabase.from('usuarios').update({ ativo: novoAtivo }).eq('id', u.id)
     setSelectedUsuario(v => ({ ...v, ativo: novoAtivo }))
     setUsuarios(list => list.map(x => x.id === u.id ? { ...x, ativo: novoAtivo } : x))
+  }
+
+  async function salvarEdicaoUsuario() {
+    setSalvandoEdicaoUsuario(true)
+    const perfil = formEditUsuario.perfil || selectedUsuario.perfil
+    if (perfil) await supabase.from('usuarios').update({ perfil }).eq('id', selectedUsuario.id)
+    await supabase.from('usuario_equipes').delete().eq('usuario_id', selectedUsuario.id)
+    if (formEditUsuario.equipe_id) await supabase.from('usuario_equipes').upsert({ usuario_id: selectedUsuario.id, equipe_id: formEditUsuario.equipe_id })
+    const novaEquipe = formEditUsuario.equipe_id ? [formEditUsuario.equipe_id] : []
+    setUsuarioOrgs(prev => ({ ...prev, equipes: novaEquipe }))
+    setSelectedUsuario(v => ({ ...v, perfil: formEditUsuario.perfil }))
+    setUsuarios(list => list.map(x => x.id === selectedUsuario.id ? { ...x, perfil: formEditUsuario.perfil } : x))
+    setSalvandoEdicaoUsuario(false)
+    setEditandoUsuario(false)
   }
 
   async function deletarUsuario(uid) {
@@ -357,7 +387,7 @@ export default function Dashboard() {
     setLoadingEvang(true)
     const { data } = await supabase
       .from('abordagens')
-      .select('*, usuarios(nome)')
+      .select('*, usuarios(nome), equipes(nome)')
       .order('data_hora', { ascending: false })
     setAbordagens(data || [])
     setLoadingEvang(false)
@@ -385,13 +415,15 @@ export default function Dashboard() {
     }
     setSalvandoAbordagem(true)
     const pessoasValidas = pessoas.filter(p => p.nome.trim())
+    const enderecoCompleto = formAbordagem.endereco
     const { error } = await supabase.rpc('registrar_abordagem', {
-      p_local: formAbordagem.endereco,
-      p_endereco: formAbordagem.endereco || null,
+      p_local: enderecoCompleto,
+      p_endereco: enderecoCompleto || null,
       p_data_hora: formAbordagem.data_hora || new Date().toISOString(),
       p_usuario_id: user?.id,
       p_observacao: formAbordagem.observacao || null,
       p_pessoas: pessoasValidas,
+      p_equipe_id: usuarioOrgs.equipes?.[0] || null,
     })
     setSalvandoAbordagem(false)
     if (!error) {
@@ -484,13 +516,34 @@ export default function Dashboard() {
       endereco: formEditAbordagem.endereco,
       data_hora: formEditAbordagem.data_hora || null,
       observacao: formEditAbordagem.observacao || null,
+      equipe_id: formEditAbordagem.equipe_id || null,
     }).eq('id', abordagemSelecionada.id)
     setSalvandoEditAbordagem(false)
     if (!error) {
-      const atualizada = { ...abordagemSelecionada, ...formEditAbordagem, local: formEditAbordagem.endereco }
+      const equipeNome = equipes.find(e => e.id === formEditAbordagem.equipe_id)
+      const atualizada = { ...abordagemSelecionada, ...formEditAbordagem, local: formEditAbordagem.endereco, equipes: equipeNome ? { nome: equipeNome.nome } : null }
       setAbordagemSelecionada(atualizada)
       setAbordagens(list => list.map(a => a.id === atualizada.id ? atualizada : a))
       setEditandoAbordagem(false)
+    }
+  }
+
+  async function salvarNovaPessoa() {
+    if (!formNovaPessoa.nome.trim()) return
+    setSalvandoNovaPessoa(true)
+    const { data, error } = await supabase.from('evangelizados').insert({
+      abordagem_id: abordagemSelecionada.id,
+      nome: formNovaPessoa.nome,
+      telefone: formNovaPessoa.telefone || null,
+      endereco_pessoa: formNovaPessoa.endereco_pessoa || null,
+      observacao: formNovaPessoa.observacao || null,
+      status_contato: 'pendente',
+    }).select().single()
+    setSalvandoNovaPessoa(false)
+    if (!error && data) {
+      setEvangelizados(list => [...list, data])
+      setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '' })
+      setAdicionandoPessoa(false)
     }
   }
 
@@ -534,7 +587,10 @@ export default function Dashboard() {
             {agendaDiaEventoAberto ? (
               // Tela de detalhe
               <>
-                <button onClick={() => setAgendaDiaEventoAberto(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontWeight: 700, fontSize: '13px', marginBottom: '20px', padding: 0, fontFamily: 'inherit' }}>← Voltar</button>
+                <button onClick={() => setAgendaDiaEventoAberto(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', marginBottom: '20px', padding: 0, fontFamily: 'inherit' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Voltar
+                </button>
                 {(() => {
                   const ev = agendaDiaModal.evsDia.find(e => e.id === agendaDiaEventoAberto)
                   if (!ev) return null
@@ -1007,7 +1063,10 @@ export default function Dashboard() {
                   </div>
                 ) : (
                   <>
-                    <button style={s.backBtn} onClick={() => { setSelected(null); setEditandoStatus(false); setAlertaCampos(null) }}>Voltar</button>
+                    <button onClick={() => { setSelected(null); setEditandoStatus(false); setAlertaCampos(null) }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                      Voltar
+                    </button>
                     <button style={s.editBtn} onClick={iniciarEdicao}>Editar</button>
                   </>
                 )}
@@ -2020,7 +2079,7 @@ export default function Dashboard() {
                             <div style={{ position: 'relative' }}>
                               <label style={s.fieldLabel}>Endereço (onde mora)</label>
                               <input
-                                style={{ ...s.inputEdit, borderColor: pessoasConfirmadas[idx] ? '#F97310' : undefined }}
+                                style={s.inputEdit}
                                 placeholder="Digite e selecione uma opção"
                                 value={pessoa.endereco_pessoa}
                                 onChange={e => buscarSugestoesPessoa(idx, e.target.value)}
@@ -2050,13 +2109,13 @@ export default function Dashboard() {
 
                       <div style={{ position: 'relative' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <label style={{ ...s.fieldLabel, marginBottom: 0 }}>Endereço / Local</label>
+                          <label style={{ ...s.fieldLabel, marginBottom: 0 }}>Endereço do evangelismo</label>
                           <button type="button" onClick={usarLocalizacaoAtual} disabled={buscandoLocalizacao} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', padding: 0, fontFamily: 'inherit' }}>
                             {buscandoLocalizacao ? 'Buscando...' : 'Preenchimento automático'}
                           </button>
                         </div>
                         <input
-                          style={{ ...s.inputEdit, borderColor: enderecoConfirmado ? '#F97310' : undefined }}
+                          style={s.inputEdit}
                           placeholder="Digite o endereço e selecione uma opção"
                           value={formAbordagem.endereco}
                           onChange={e => buscarSugestoesEndereco(e.target.value)}
@@ -2089,7 +2148,7 @@ export default function Dashboard() {
                     {erroAbordagem && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '10px 14px', fontSize: '13px', color: '#dc2626', fontWeight: 600, marginTop: '8px' }}>{erroAbordagem}</div>}
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '12px' }}>
-                      <button style={{ ...s.editBtn, background: '#f3f4f6', color: '#6b7280', border: '1.5px solid #e5e7eb', textAlign: 'center' }} onClick={() => { setModalAbordagem(false); setErroAbordagem('') }}>Cancelar</button>
+                      <button style={{ ...s.backBtn, textAlign: 'center' }} onClick={() => { setModalAbordagem(false); setErroAbordagem('') }}>Cancelar</button>
                       <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', textAlign: 'center' }} onClick={salvarAbordagem} disabled={salvandoAbordagem}>
                         {salvandoAbordagem ? 'Salvando...' : 'Salvar'}
                       </button>
@@ -2102,8 +2161,11 @@ export default function Dashboard() {
                 <>
                   <div style={{ marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                      <button style={s.backBtn} onClick={() => { setAbordagemSelecionada(null); setEvangelizados([]); setEditandoEvangelizado(null); setEditandoAbordagem(false) }}>Voltar</button>
-                      {!editandoAbordagem && <button style={s.editBtn} onClick={() => { setEditandoAbordagem(true); setFormEditAbordagem({ endereco: abordagemSelecionada.endereco || abordagemSelecionada.local, data_hora: abordagemSelecionada.data_hora ? abordagemSelecionada.data_hora.slice(0,16) : '', observacao: abordagemSelecionada.observacao || '' }) }}>Editar abordagem</button>}
+                      <button onClick={() => { setAbordagemSelecionada(null); setEvangelizados([]); setEditandoEvangelizado(null); setEditandoAbordagem(false) }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        Voltar
+                      </button>
+                      {!editandoAbordagem && (perfilUsuario === 'admin' || abordagemSelecionada.usuario_id === user?.id) && <button style={{ ...s.editBtn, background: '#F97310', border: 'none', color: '#fff' }} onClick={() => { setEditandoAbordagem(true); setFormEditAbordagem({ endereco: abordagemSelecionada.endereco || abordagemSelecionada.local, data_hora: abordagemSelecionada.data_hora ? abordagemSelecionada.data_hora.slice(0,16) : '', observacao: abordagemSelecionada.observacao || '', equipe_id: abordagemSelecionada.equipe_id || '' }) }}>Editar abordagem</button>}
                     </div>
 
                     {editandoAbordagem ? (
@@ -2117,23 +2179,41 @@ export default function Dashboard() {
                         </div>
                       </div>
                     ) : (
-                      <div>
-                        <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117' }}>{abordagemSelecionada.local}</div>
-                        {abordagemSelecionada.endereco && <div style={{ fontSize: '13px', color: '#6b7280' }}>{abordagemSelecionada.endereco}</div>}
-                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
-                          {abordagemSelecionada.data_hora ? new Date(abordagemSelecionada.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
-                          {abordagemSelecionada.usuarios?.nome ? ` · por ${abordagemSelecionada.usuarios.nome}` : ''}
+                      <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '6px' }}>Abordagem</div>
+                        <div style={{ fontSize: '20px', fontWeight: 900, color: '#0f1117', marginBottom: '16px', lineHeight: 1.3 }}>{abordagemSelecionada.local}</div>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {abordagemSelecionada.data_hora && (
+                            <span style={{ background: '#f3f4f6', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: 700, color: '#374151' }}>
+                              {new Date(abordagemSelecionada.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                            </span>
+                          )}
+                          {abordagemSelecionada.usuarios?.nome && (
+                            <span style={{ background: '#fff4ec', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: 700, color: '#F97310' }}>
+                              {abordagemSelecionada.usuarios.nome}
+                            </span>
+                          )}
+                          {abordagemSelecionada.equipes?.nome && (
+                            <span style={{ background: '#eff6ff', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: 700, color: '#2563eb' }}>
+                              {abordagemSelecionada.equipes.nome}
+                            </span>
+                          )}
+                          <span style={{ background: '#f3f4f6', borderRadius: '20px', padding: '4px 12px', fontSize: '12px', fontWeight: 700, color: '#374151' }}>
+                            {evangelizados.length} pessoa{evangelizados.length !== 1 ? 's' : ''}
+                          </span>
                         </div>
-                        {abordagemSelecionada.observacao && <div style={{ fontSize: '12px', color: '#9ca3af', fontStyle: 'italic', marginTop: '4px' }}>{abordagemSelecionada.observacao}</div>}
+                        {abordagemSelecionada.observacao && (
+                          <div style={{ marginTop: '14px', fontSize: '13px', color: '#6b7280', fontStyle: 'italic', borderTop: '1px solid #f3f4f6', paddingTop: '12px' }}>{abordagemSelecionada.observacao}</div>
+                        )}
                       </div>
                     )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {evangelizados.length === 0 && <p style={s.info}>Nenhuma pessoa registrada.</p>}
                     {evangelizados.map(ev => (
-                      <div key={ev.id} style={{ background: '#fff', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                      <div key={ev.id} style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                         {editandoEvangelizado === ev.id ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '16px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                               <div><label style={s.fieldLabel}>Nome</label><input style={s.inputEdit} value={formEditEvangelizado.nome || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, nome: e.target.value }))} /></div>
                               <div><label style={s.fieldLabel}>Telefone</label><input style={s.inputEdit} value={formEditEvangelizado.telefone || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, telefone: e.target.value }))} /></div>
@@ -2146,37 +2226,61 @@ export default function Dashboard() {
                             </div>
                           </div>
                         ) : (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
-                            <div>
-                              <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f1117' }}>{ev.nome}</div>
-                              {ev.telefone && <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>{ev.telefone}</div>}
-                              {ev.endereco_pessoa && <div style={{ fontSize: '12px', color: '#9ca3af' }}>{ev.endereco_pessoa}</div>}
-                              {ev.observacao && <div style={{ fontSize: '12px', color: '#9ca3af', fontStyle: 'italic' }}>{ev.observacao}</div>}
+                          <div style={{ padding: '0' }}>
+                            <div style={{ background: '#f3f4f6', borderRadius: '12px 12px 0 0', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', overflow: 'hidden' }}>
+                              <div>
+                                <div style={{ fontSize: '16px', fontWeight: 900, color: '#0f1117' }}>{ev.nome}</div>
+                                <div style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>
+                                  {ev.status_contato === 'sem_resposta' ? 'Sem resposta' : ev.status_contato}
+                                </div>
+                              </div>
+                              {(perfilUsuario === 'admin' || abordagemSelecionada.usuario_id === user?.id) && (
+                                <button
+                                  onClick={() => { setEditandoEvangelizado(ev.id); setFormEditEvangelizado({ nome: ev.nome, telefone: ev.telefone, endereco_pessoa: ev.endereco_pessoa, observacao: ev.observacao }) }}
+                                  style={{ background: '#fff', border: 'none', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 700, color: '#0f1117', cursor: 'pointer', fontFamily: 'inherit' }}
+                                >Editar</button>
+                              )}
                             </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
-                              <select
-                                value={ev.status_contato}
-                                onChange={e => atualizarStatusEvangelizado(ev.id, e.target.value)}
-                                style={{ ...s.inputEdit, width: 'auto', minWidth: '140px', fontSize: '13px', fontWeight: 700, color: ev.status_contato === 'discipulado' ? '#16a34a' : ev.status_contato === 'contatado' ? '#F97310' : ev.status_contato === 'sem_resposta' ? '#6b7280' : '#0f1117' }}
-                              >
-                                <option value="pendente">Pendente</option>
-                                <option value="contatado">Contatado</option>
-                                <option value="sem_resposta">Sem resposta</option>
-                                <option value="discipulado">Discipulado</option>
-                              </select>
-                              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '12px', fontWeight: 700, fontFamily: 'inherit', padding: 0 }} onClick={() => { setEditandoEvangelizado(ev.id); setFormEditEvangelizado({ nome: ev.nome, telefone: ev.telefone, endereco_pessoa: ev.endereco_pessoa, observacao: ev.observacao }) }}>Editar</button>
+                            <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              {ev.telefone && <div style={{ fontSize: '13px', color: '#374151' }}><span style={{ color: '#9ca3af', fontWeight: 700, marginRight: '6px' }}>Telefone</span>{ev.telefone}</div>}
+                              {ev.endereco_pessoa && <div style={{ fontSize: '13px', color: '#374151' }}><span style={{ color: '#9ca3af', fontWeight: 700, marginRight: '6px' }}>Endereço</span>{ev.endereco_pessoa}</div>}
+                              {ev.observacao && <div style={{ fontSize: '13px', color: '#374151' }}><span style={{ color: '#9ca3af', fontWeight: 700, marginRight: '6px' }}>Obs</span>{ev.observacao}</div>}
                             </div>
                           </div>
                         )}
                       </div>
                     ))}
                   </div>
+
+                  {(perfilUsuario === 'admin' || abordagemSelecionada.usuario_id === user?.id) && (
+                    adicionandoPessoa ? (
+                      <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginTop: '8px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                          <div><label style={s.fieldLabel}>Nome</label><input style={s.inputEdit} placeholder="Nome" value={formNovaPessoa.nome} onChange={e => setFormNovaPessoa(f => ({ ...f, nome: e.target.value }))} /></div>
+                          <div><label style={s.fieldLabel}>Telefone</label><input style={s.inputEdit} placeholder="Telefone" value={formNovaPessoa.telefone} onChange={e => setFormNovaPessoa(f => ({ ...f, telefone: e.target.value }))} /></div>
+                          <div><label style={s.fieldLabel}>Endereço</label><input style={s.inputEdit} placeholder="Endereço" value={formNovaPessoa.endereco_pessoa} onChange={e => setFormNovaPessoa(f => ({ ...f, endereco_pessoa: e.target.value }))} /></div>
+                          <div><label style={s.fieldLabel}>Observação</label><input style={s.inputEdit} placeholder="Observação" value={formNovaPessoa.observacao} onChange={e => setFormNovaPessoa(f => ({ ...f, observacao: e.target.value }))} /></div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button style={{ ...s.backBtn, background: '#9ca3af', border: 'none', color: '#fff' }} onClick={() => { setAdicionandoPessoa(false); setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '' }) }}>Cancelar</button>
+                          <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarNovaPessoa} disabled={salvandoNovaPessoa}>{salvandoNovaPessoa ? 'Salvando...' : 'Salvar'}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontSize: '13px', fontWeight: 700, padding: '8px 0', fontFamily: 'inherit', marginTop: '4px' }} onClick={() => setAdicionandoPessoa(true)}>+ Adicionar pessoa</button>
+                    )
+                  )}
                 </>
               ) : (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                     <h2 style={{ ...s.pageTitle, marginBottom: 0 }}>Evangelismo</h2>
-                    <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={() => setModalAbordagem(true)}>+ Nova abordagem</button>
+                    <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={() => {
+                      const agora = new Date()
+                      const dataHoraLocal = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}-${String(agora.getDate()).padStart(2,'0')}T${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+                      setFormAbordagem(f => ({ ...f, data_hora: dataHoraLocal }))
+                      setModalAbordagem(true)
+                    }}>+ Nova abordagem</button>
                   </div>
                   {loadingEvang && <p style={s.info}>Carregando...</p>}
                   {!loadingEvang && abordagens.length === 0 && <p style={s.info}>Nenhuma abordagem registrada ainda.</p>}
@@ -2194,6 +2298,7 @@ export default function Dashboard() {
                           <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
                             {ab.data_hora ? new Date(ab.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
                             {ab.usuarios?.nome ? ` · por ${ab.usuarios.nome}` : ''}
+                            {ab.equipes?.nome ? ` · ${ab.equipes.nome}` : ''}
                           </div>
                         </div>
                         <span style={{ fontSize: '12px', fontWeight: 700, color: '#F97310' }}>Ver →</span>
@@ -2255,7 +2360,7 @@ export default function Dashboard() {
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
                       <div style={{ ...s.cardAvatar, width: '52px', height: '52px', fontSize: '22px', borderRadius: '50%', flexShrink: 0 }}>{selectedUsuario.nome?.[0]?.toUpperCase()}</div>
-                      <div>
+                      <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f1117' }}>{selectedUsuario.nome}</div>
                         <div style={{ fontSize: '13px', color: '#6b7280' }}>{selectedUsuario.email}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
@@ -2269,10 +2374,13 @@ export default function Dashboard() {
                     {!confirmDeleteUsuario ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-                        {/* Ativar/Desativar */}
-                        <button onClick={() => ativarUsuario(selectedUsuario)} style={{ width: '100%', background: selectedUsuario.ativo ? '#f3f4f6' : '#dcfce7', color: selectedUsuario.ativo ? '#374151' : '#16a34a', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                          {selectedUsuario.ativo ? 'Desativar acesso' : 'Ativar acesso'}
-                        </button>
+                        {/* Ativar/Desativar + Excluir */}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button onClick={() => ativarUsuario(selectedUsuario)} style={{ flex: 1, background: selectedUsuario.ativo ? '#f3f4f6' : '#dcfce7', color: selectedUsuario.ativo ? '#374151' : '#16a34a', border: 'none', borderRadius: '8px', padding: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                            {selectedUsuario.ativo ? 'Desativar' : 'Ativar'}
+                          </button>
+                          <button onClick={() => setConfirmDeleteUsuario(true)} style={{ flex: 1, background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '8px', padding: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Excluir</button>
+                        </div>
 
                         {/* Editar campos */}
                         <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -2280,12 +2388,7 @@ export default function Dashboard() {
 
                           <div>
                             <label style={s.fieldLabel}>Perfil</label>
-                            <select style={s.inputEdit} value={selectedUsuario.perfil || ''} onChange={async e => {
-                              const perfil = e.target.value
-                              await supabase.from('usuarios').update({ perfil }).eq('id', selectedUsuario.id)
-                              setSelectedUsuario(v => ({ ...v, perfil }))
-                              setUsuarios(list => list.map(x => x.id === selectedUsuario.id ? { ...x, perfil } : x))
-                            }}>
+                            <select style={s.inputEdit} value={formEditUsuario.perfil ?? selectedUsuario.perfil ?? ''} onChange={e => setFormEditUsuario(f => ({ ...f, perfil: e.target.value }))}>
                               <option value="admin">Admin</option>
                               <option value="lider">Líder</option>
                               <option value="voluntario">Voluntário</option>
@@ -2296,13 +2399,10 @@ export default function Dashboard() {
 
                           <EquipeRadio
                             itens={equipes}
-                            selecionado={usuarioOrgs.equipes[0] || null}
-                            onSelect={async (id) => {
-                              await supabase.from('usuario_equipes').delete().eq('usuario_id', selectedUsuario.id)
-                              if (id) await supabase.from('usuario_equipes').insert({ usuario_id: selectedUsuario.id, equipe_id: id })
-                              setUsuarioOrgs(prev => ({ ...prev, equipes: id ? [id] : [] }))
-                            }}
+                            selecionado={formEditUsuario.equipe_id !== undefined ? formEditUsuario.equipe_id : (usuarioOrgs.equipes[0] || null)}
+                            onSelect={(id) => { setFormEditUsuario(f => ({ ...f, equipe_id: id })); setErroEquipeObrigatoria(false) }}
                             fieldLabel={s.fieldLabel}
+                            erro={erroEquipeObrigatoria}
                           />
                           <EquipeGrupoCheckbox
                             label="Grupos"
@@ -2341,20 +2441,18 @@ export default function Dashboard() {
                               </ul>
                             )}
                           </div>
-                        </div>
 
-                        {/* Excluir */}
-                        <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '16px' }}>
-                          <button onClick={() => setConfirmDeleteUsuario(true)} style={{ width: '100%', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                            Excluir usuário
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                            <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => { setSelectedUsuario(null); setFormEditUsuario({}) }}>Cancelar</button>
+                            <button style={{ ...s.editBtn, flex: 1, background: '#F97310', color: '#fff', textAlign: 'center', border: 'none' }} onClick={salvarEdicaoUsuario} disabled={salvandoEdicaoUsuario}>{salvandoEdicaoUsuario ? 'Salvando...' : 'Salvar'}</button>
+                          </div>
                         </div>
                       </div>
                     ) : (
                       <div style={{ textAlign: 'center' }}>
                         <p style={{ fontSize: '14px', color: '#374151', marginBottom: '16px' }}>Tem certeza? Esta ação não pode ser desfeita.</p>
                         <div style={{ display: 'flex', gap: '10px' }}>
-                          <button onClick={() => setConfirmDeleteUsuario(false)} style={{ flex: 1, background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                          <button onClick={() => setConfirmDeleteUsuario(false)} style={{ ...s.backBtn, flex: 1, borderRadius: '10px', padding: '12px', textAlign: 'center' }}>Cancelar</button>
                           <button onClick={() => deletarUsuario(selectedUsuario.id)} disabled={deletandoUsuario} style={{ flex: 1, background: '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
                             {deletandoUsuario ? 'Excluindo...' : 'Confirmar exclusão'}
                           </button>
@@ -2367,7 +2465,7 @@ export default function Dashboard() {
 
               <div style={s.cards}>
                 {usuarios.map(u => (
-                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={() => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos() }}>
+                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={async () => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); const orgs = await carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos() }}>
                     <div style={s.cardAvatar}>{u.nome?.[0]?.toUpperCase()}</div>
                     <div style={s.cardInfo}>
                       <div style={s.cardNome}>{u.nome}</div>
@@ -2459,7 +2557,7 @@ export default function Dashboard() {
   )
 }
 
-function EquipeRadio({ itens, selecionado, onSelect, fieldLabel }) {
+function EquipeRadio({ itens, selecionado, onSelect, fieldLabel, erro }) {
   const [busca, setBusca] = useState('')
   const [aberto, setAberto] = useState(false)
   const filtrados = itens.filter(o => o.nome.toLowerCase().includes(busca.toLowerCase()))
@@ -2472,22 +2570,23 @@ function EquipeRadio({ itens, selecionado, onSelect, fieldLabel }) {
         value={busca}
         onChange={e => { setBusca(e.target.value); setAberto(e.target.value.length > 0) }}
         onBlur={() => setTimeout(() => { setAberto(false); setBusca('') }, 200)}
-        placeholder={nomeSelecionado || 'Buscar equipe...'}
+        placeholder={nomeSelecionado || 'Buscar equipes...'}
         autoComplete="off"
-        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: '#1a1d27', outline: 'none', boxSizing: 'border-box', marginTop: '6px' }}
+        style={{ width: '100%', padding: '8px 12px', border: `1.5px solid ${erro ? '#F97310' : '#e5e7eb'}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: '#1a1d27', outline: 'none', boxSizing: 'border-box', marginTop: '6px' }}
       />
       {aberto && filtrados.length > 0 && (
         <div style={{ position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 300, overflow: 'hidden' }}>
           <div style={{ maxHeight: '180px', overflowY: 'auto' }}>
             {filtrados.map(o => (
-              <label key={o.id} onMouseDown={e => e.preventDefault()} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', cursor: 'pointer', fontSize: '14px', color: '#374151', fontWeight: selecionado === o.id ? 700 : 400, borderBottom: '1px solid #f3f4f6' }}>
-                <input type="radio" name="equipe_radio" checked={selecionado === o.id} onChange={() => onSelect(o.id)} style={{ accentColor: '#F97310', width: '16px', height: '16px' }} />
+              <label key={o.id} onMouseDown={e => e.preventDefault()} onClick={() => { onSelect(o.id); setAberto(false); setBusca('') }} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', cursor: 'pointer', fontSize: '14px', color: '#374151', fontWeight: selecionado === o.id ? 700 : 400, borderBottom: '1px solid #f3f4f6' }}>
+                <input type="radio" name="equipe_radio" checked={selecionado === o.id} onChange={() => {}} style={{ accentColor: '#F97310', width: '16px', height: '16px' }} />
                 {o.nome}
               </label>
             ))}
           </div>
         </div>
       )}
+      {erro && <div style={{ fontSize: '12px', color: '#F97310', fontWeight: 700, marginTop: '4px' }}>Vincule uma equipe antes de ativar o usuário.</div>}
     </div>
   )
 }
@@ -2727,7 +2826,7 @@ const s = {
     paddingTop: '32px',
     paddingLeft: '32px',
     paddingRight: '32px',
-    paddingBottom: '0',
+    paddingBottom: '40px',
     overflowY: 'auto',
     minHeight: 0,
   },
@@ -2869,14 +2968,15 @@ const s = {
     marginBottom: '6px',
   },
   backBtn: {
-    background: 'none',
-    border: '2px solid #F97310',
-    color: '#F97310',
+    background: '#9ca3af',
+    border: 'none',
+    color: '#fff',
     fontWeight: 700,
     fontSize: '14px',
     cursor: 'pointer',
     padding: '6px 20px',
     borderRadius: '8px',
+    fontFamily: 'inherit',
   },
   editBtn: {
     background: 'none',

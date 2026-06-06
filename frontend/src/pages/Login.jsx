@@ -153,7 +153,7 @@ export default function Login() {
         <div style={s.leftInner}>
           {/* Logo */}
           <a href="/" style={s.logo}>
-            <img src="/logo1.png" alt="Logo" style={{height:'34px', width:'auto'}} />
+            <img src="/icon-512.png" alt="Logo" style={{height:'34px', width:'auto'}} />
             <span style={s.logoText}>Cruzada <span style={{color:'#F97310'}}>Ibirité</span></span>
           </a>
 
@@ -253,7 +253,7 @@ export default function Login() {
             <>
               <div style={s.formTop}>
                 <div style={s.formTopIcon}>
-                  <img src="/logo1.png" alt="Logo" style={{height:'72px', width:'auto'}} />
+                  <img src="/icon-512.png" alt="Logo" style={{height:'72px', width:'auto'}} />
                 </div>
                 <h1 style={s.formTitle} className="login-form-title">Bem-vindo</h1>
                 <p style={s.formSub} className="login-form-sub">Entre com sua conta para acessar a plataforma da Cruzada</p>

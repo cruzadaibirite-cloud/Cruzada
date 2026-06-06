@@ -169,7 +169,7 @@ export default function CadastroVoluntario() {
       <div style={s.header} className="cad-header">
         <div style={s.headerNav} className="cad-header-nav">
           <div style={s.headerLogo}>
-            <img src="/logo1.png" alt="Logo" style={{ height: '38px', width: 'auto' }} />
+            <img src="/icon-512.png" alt="Logo" style={{ height: '38px', width: 'auto' }} />
             <span style={s.headerTitle} className="cad-header-title">Cruzada <span style={{ color: '#F97310' }}>Ibirité</span></span>
           </div>
           <a href="/cruzada" style={s.backLink}>← Voltar</a>
