@@ -152,6 +152,15 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    if (modalEvento) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [modalEvento])
+
+  useEffect(() => {
     if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'locais' || menu === 'agenda') carregarLocais()
@@ -349,15 +358,28 @@ export default function Dashboard() {
   async function salvarEdicaoUsuario() {
     setSalvandoEdicaoUsuario(true)
     const perfil = formEditUsuario.perfil || selectedUsuario.perfil
-    if (perfil) await supabase.from('usuarios').update({ perfil }).eq('id', selectedUsuario.id)
-    await supabase.from('usuario_equipes').delete().eq('usuario_id', selectedUsuario.id)
-    if (formEditUsuario.equipe_id) await supabase.from('usuario_equipes').upsert({ usuario_id: selectedUsuario.id, equipe_id: formEditUsuario.equipe_id })
+    let erro = false
+    if (perfil) {
+      const { error } = await supabase.from('usuarios').update({ perfil }).eq('id', selectedUsuario.id)
+      if (error) erro = true
+    }
+    if (!erro) {
+      const { error } = await supabase.from('usuario_equipes').delete().eq('usuario_id', selectedUsuario.id)
+      if (error) erro = true
+    }
+    if (!erro && formEditUsuario.equipe_id) {
+      const { error } = await supabase.from('usuario_equipes').upsert({ usuario_id: selectedUsuario.id, equipe_id: formEditUsuario.equipe_id })
+      if (error) erro = true
+    }
+    setSalvandoEdicaoUsuario(false)
+    if (erro) return
     const novaEquipe = formEditUsuario.equipe_id ? [formEditUsuario.equipe_id] : []
     setUsuarioOrgs(prev => ({ ...prev, equipes: novaEquipe }))
     setSelectedUsuario(v => ({ ...v, perfil: formEditUsuario.perfil }))
     setUsuarios(list => list.map(x => x.id === selectedUsuario.id ? { ...x, perfil: formEditUsuario.perfil } : x))
-    setSalvandoEdicaoUsuario(false)
     setEditandoUsuario(false)
+    setSelectedUsuario(null)
+    setErroEquipeObrigatoria(false)
   }
 
   async function deletarUsuario(uid) {
@@ -1574,25 +1596,39 @@ export default function Dashboard() {
               <>
                 {/* Modal novo evento / ver evento */}
                 {modalEvento && (
-                  <div style={s.modalOverlay} onClick={() => { setModalEvento(null); setConfirmarExclusao(false) }}>
-                    <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                  <div style={window.innerWidth < 768
+                    ? { position: 'fixed', inset: 0, background: '#fff', zIndex: 1000, overflowY: 'auto', display: 'flex', flexDirection: 'column' }
+                    : s.modalOverlay} onClick={window.innerWidth < 768 ? undefined : () => { setModalEvento(null); setConfirmarExclusao(false) }}>
+                    {window.innerWidth < 768 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', borderBottom: '1px solid #f3f4f6', position: 'sticky', top: 0, background: '#fff', zIndex: 10 }}>
+                        <button onClick={() => { setModalEvento(null); setConfirmarExclusao(false) }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                          Voltar
+                        </button>
+                        <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117' }}>
+                          {modalEvento.tipo === 'novo' ? 'Novo evento' : modalEvento.tipo === 'editar' ? 'Editar evento' : modalEvento.evento?.titulo}
+                        </span>
+                      </div>
+                    )}
+                    <div style={window.innerWidth < 768
+                      ? { padding: '24px 16px', flex: 1 }
+                      : { background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative' }} onClick={e => e.stopPropagation()}>
                       {modalEvento.tipo === 'novo' ? (
                         <>
-                          <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>
+                          {window.innerWidth >= 768 && <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>
                             Novo evento — {modalEvento.dia.getDate()} de {MESES[modalEvento.dia.getMonth()]}
-                          </h3>
+                          </h3>}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             {/* Título - linha inteira */}
                             <div>
                               <label style={s.fieldLabel}>Título</label>
                               <input style={s.inputEdit} value={formEvento.titulo} onChange={e => setFormEvento(f => ({ ...f, titulo: e.target.value }))} placeholder="Nome do evento" autoFocus />
                             </div>
-                            {/* Data + Início + Fim em 3 colunas */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                              <div>
-                                <label style={s.fieldLabel}>Data</label>
-                                <input type="date" style={s.inputEdit} value={formEvento.data} onChange={e => setFormEvento(f => ({ ...f, data: e.target.value }))} />
-                              </div>
+                            <div>
+                              <label style={s.fieldLabel}>Data</label>
+                              <input type="date" style={s.inputEdit} value={formEvento.data} onChange={e => setFormEvento(f => ({ ...f, data: e.target.value }))} />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                               <div>
                                 <label style={s.fieldLabel}>Início</label>
                                 <input type="time" style={s.inputEdit} value={formEvento.horaInicio} onChange={e => setFormEvento(f => ({ ...f, horaInicio: e.target.value }))} />
@@ -1622,7 +1658,7 @@ export default function Dashboard() {
                                 )}
                               </div>
                               <div style={{ position: 'relative' }}>
-                                <label style={s.fieldLabel}>Organização</label>
+                                <label style={s.fieldLabel}>Equipe</label>
                                 <input style={s.inputEdit} value={formEvento.equipe} onChange={e => setFormEvento(f => ({ ...f, equipe: e.target.value, equipeId: null }))} placeholder="Pesquisar equipe..." autoComplete="off" />
                                 {formEvento.equipe.length > 0 && !formEvento.equipeId && equipes.filter(o => o.nome.toLowerCase().includes(formEvento.equipe.toLowerCase())).length > 0 && (
                                   <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
@@ -1646,31 +1682,31 @@ export default function Dashboard() {
                             <div>
                               <label style={s.fieldLabel}>Cor</label>
                               <div style={{ display: 'flex', gap: '8px' }}>
-                                {['#F97310','#0f1117','#ffffff'].map(cor => (
+                                {['#F97310','#0f1117','#ffffff','#d1d5db','#6b7280'].map(cor => (
                                   <div key={cor} onClick={() => setFormEvento(f => ({ ...f, cor }))}
                                     style={{ width: '32px', height: '32px', borderRadius: '50%', background: cor, cursor: 'pointer', border: formEvento.cor === cor ? '3px solid #F97310' : '2px solid #e5e7eb', boxSizing: 'border-box' }} />
                                 ))}
                               </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
-                              <button style={s.backBtn} onClick={() => setModalEvento(null)}>Cancelar</button>
-                              <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1 }} onClick={salvarEvento}>Criar evento</button>
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '4px', justifyContent: 'center' }}>
+                              <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => setModalEvento(null)}>Cancelar</button>
+                              <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1, textAlign: 'center' }} onClick={salvarEvento}>Salvar</button>
                             </div>
                           </div>
                         </>
                       ) : modalEvento.tipo === 'editar' ? (
                         <>
-                          <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Editar evento</h3>
+                          {window.innerWidth >= 768 && <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Editar evento</h3>}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             <div>
                               <label style={s.fieldLabel}>Título</label>
                               <input style={s.inputEdit} value={formEditEvento.titulo} onChange={e => setFormEditEvento(f => ({ ...f, titulo: e.target.value }))} autoFocus />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-                              <div>
-                                <label style={s.fieldLabel}>Data</label>
-                                <input type="date" style={s.inputEdit} value={formEditEvento.data} onChange={e => setFormEditEvento(f => ({ ...f, data: e.target.value }))} />
-                              </div>
+                            <div>
+                              <label style={s.fieldLabel}>Data</label>
+                              <input type="date" style={s.inputEdit} value={formEditEvento.data} onChange={e => setFormEditEvento(f => ({ ...f, data: e.target.value }))} />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                               <div>
                                 <label style={s.fieldLabel}>Início</label>
                                 <input type="time" style={s.inputEdit} value={formEditEvento.horaInicio} onChange={e => setFormEditEvento(f => ({ ...f, horaInicio: e.target.value }))} />
@@ -1699,7 +1735,7 @@ export default function Dashboard() {
                                 )}
                               </div>
                               <div style={{ position: 'relative' }}>
-                                <label style={s.fieldLabel}>Organização</label>
+                                <label style={s.fieldLabel}>Equipe</label>
                                 <input style={s.inputEdit} value={formEditEvento.equipe || ''} onChange={e => setFormEditEvento(f => ({ ...f, equipe: e.target.value, equipeId: null }))} placeholder="Pesquisar equipe..." autoComplete="off" />
                                 {(formEditEvento.equipe || '').length > 0 && !formEditEvento.equipeId && equipes.filter(o => o.nome.toLowerCase().includes((formEditEvento.equipe || '').toLowerCase())).length > 0 && (
                                   <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
@@ -1723,15 +1759,15 @@ export default function Dashboard() {
                             <div>
                               <label style={s.fieldLabel}>Cor</label>
                               <div style={{ display: 'flex', gap: '8px' }}>
-                                {['#F97310','#0f1117','#ffffff'].map(cor => (
+                                {['#F97310','#0f1117','#ffffff','#d1d5db','#6b7280'].map(cor => (
                                   <div key={cor} onClick={() => setFormEditEvento(f => ({ ...f, cor }))}
                                     style={{ width: '32px', height: '32px', borderRadius: '50%', background: cor, cursor: 'pointer', border: formEditEvento.cor === cor ? '3px solid #F97310' : '2px solid #e5e7eb', boxSizing: 'border-box' }} />
                                 ))}
                               </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-                              <button style={s.backBtn} onClick={() => setModalEvento({ tipo: 'ver', evento: modalEvento.evento })}>Cancelar</button>
-                              <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1 }} onClick={async () => {
+                            <div style={{ display: 'flex', gap: '10px', marginTop: '8px', justifyContent: 'center' }}>
+                              <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => setModalEvento({ tipo: 'ver', evento: modalEvento.evento })}>Cancelar</button>
+                              <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1, textAlign: 'center' }} onClick={async () => {
                                 if (!formEditEvento.titulo.trim()) return
                                 const payload = {
                                   titulo: formEditEvento.titulo,
@@ -1756,8 +1792,8 @@ export default function Dashboard() {
                         </>
                       ) : (
                         <>
-                          {/* X fechar */}
-                          <button onClick={() => { setModalEvento(null); setConfirmarExclusao(false) }} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                          {/* X fechar — só desktop */}
+                          {window.innerWidth >= 768 && <button onClick={() => { setModalEvento(null); setConfirmarExclusao(false) }} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>}
 
                           {!confirmarExclusao && (
                             <div style={{ marginBottom: '24px' }}>
@@ -2352,9 +2388,9 @@ export default function Dashboard() {
               {loadingUsers && <p style={s.info}>Carregando...</p>}
               {!loadingUsers && usuarios.length === 0 && <p style={s.info}>Nenhum usuário cadastrado.</p>}
               {selectedUsuario && (
-                <div style={s.modalOverlay} onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]) }}>
+                <div style={s.modalOverlay} onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setErroEquipeObrigatoria(false) }}>
                   <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]) }} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151' }}>✕</button>
+                    <button onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setErroEquipeObrigatoria(false) }} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151' }}>✕</button>
 
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
@@ -2442,7 +2478,7 @@ export default function Dashboard() {
                           </div>
 
                           <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-                            <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => { setSelectedUsuario(null); setFormEditUsuario({}) }}>Cancelar</button>
+                            <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => { setSelectedUsuario(null); setFormEditUsuario({}); setErroEquipeObrigatoria(false) }}>Cancelar</button>
                             <button style={{ ...s.editBtn, flex: 1, background: '#F97310', color: '#fff', textAlign: 'center', border: 'none' }} onClick={salvarEdicaoUsuario} disabled={salvandoEdicaoUsuario}>{salvandoEdicaoUsuario ? 'Salvando...' : 'Salvar'}</button>
                           </div>
                         </div>
@@ -2464,7 +2500,7 @@ export default function Dashboard() {
 
               <div style={s.cards}>
                 {usuarios.map(u => (
-                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={async () => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); const orgs = await carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos() }}>
+                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={async () => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); setErroEquipeObrigatoria(false); const orgs = await carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos() }}>
                     <div style={s.cardAvatar}>{u.nome?.[0]?.toUpperCase()}</div>
                     <div style={s.cardInfo}>
                       <div style={s.cardNome}>{u.nome}</div>
@@ -2482,11 +2518,11 @@ export default function Dashboard() {
       </div>
 
       {/* Bottom nav mobile */}
-      <div className="dash-bottomnav" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, height: '64px', background: '#fff', borderTop: '1px solid #e5e7eb', zIndex: 200, alignItems: 'center', justifyContent: 'space-around' }}>
+      <div className="dash-bottomnav" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, height: '64px', background: '#fff', borderTop: '1px solid #e5e7eb', zIndex: 1001, alignItems: 'center', justifyContent: 'space-around' }}>
 
         {/* Menu extra (+ button) */}
         {menuMobileAberto && (
-          <div style={{ position: 'fixed', bottom: '64px', left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 199, boxShadow: '0 -4px 24px rgba(0,0,0,0.08)' }}>
+          <div style={{ position: 'fixed', bottom: '64px', left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 1002, boxShadow: '0 -4px 24px rgba(0,0,0,0.08)' }}>
             {[
               { key: 'agenda', path: '/sistema/agenda', label: 'Agenda' },
               { key: 'evangelismo', path: '/sistema/evangelismo', label: 'Evangelismo' },
