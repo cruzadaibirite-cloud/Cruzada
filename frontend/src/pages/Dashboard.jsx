@@ -1624,18 +1624,18 @@ export default function Dashboard() {
                               <label style={s.fieldLabel}>Título</label>
                               <input style={s.inputEdit} value={formEvento.titulo} onChange={e => setFormEvento(f => ({ ...f, titulo: e.target.value }))} placeholder="Nome do evento" autoFocus />
                             </div>
-                            <div>
+                            <div style={{ minWidth: 0 }}>
                               <label style={s.fieldLabel}>Data</label>
-                              <input type="date" style={s.inputEdit} value={formEvento.data} onChange={e => setFormEvento(f => ({ ...f, data: e.target.value }))} />
+                              <input type="date" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.data} onChange={e => setFormEvento(f => ({ ...f, data: e.target.value }))} />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                              <div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', minWidth: 0 }}>
+                              <div style={{ minWidth: 0 }}>
                                 <label style={s.fieldLabel}>Início</label>
-                                <input type="time" style={s.inputEdit} value={formEvento.horaInicio} onChange={e => setFormEvento(f => ({ ...f, horaInicio: e.target.value }))} />
+                                <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.horaInicio} onChange={e => setFormEvento(f => ({ ...f, horaInicio: e.target.value }))} />
                               </div>
-                              <div>
+                              <div style={{ minWidth: 0 }}>
                                 <label style={s.fieldLabel}>Fim</label>
-                                <input type="time" style={s.inputEdit} value={formEvento.horaFim} onChange={e => setFormEvento(f => ({ ...f, horaFim: e.target.value }))} />
+                                <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.horaFim} onChange={e => setFormEvento(f => ({ ...f, horaFim: e.target.value }))} />
                               </div>
                             </div>
                             {/* Local + Equipe em 2 colunas */}
@@ -1702,18 +1702,18 @@ export default function Dashboard() {
                               <label style={s.fieldLabel}>Título</label>
                               <input style={s.inputEdit} value={formEditEvento.titulo} onChange={e => setFormEditEvento(f => ({ ...f, titulo: e.target.value }))} autoFocus />
                             </div>
-                            <div>
+                            <div style={{ minWidth: 0 }}>
                               <label style={s.fieldLabel}>Data</label>
-                              <input type="date" style={s.inputEdit} value={formEditEvento.data} onChange={e => setFormEditEvento(f => ({ ...f, data: e.target.value }))} />
+                              <input type="date" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEditEvento.data} onChange={e => setFormEditEvento(f => ({ ...f, data: e.target.value }))} />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                              <div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', minWidth: 0 }}>
+                              <div style={{ minWidth: 0 }}>
                                 <label style={s.fieldLabel}>Início</label>
-                                <input type="time" style={s.inputEdit} value={formEditEvento.horaInicio} onChange={e => setFormEditEvento(f => ({ ...f, horaInicio: e.target.value }))} />
+                                <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEditEvento.horaInicio} onChange={e => setFormEditEvento(f => ({ ...f, horaInicio: e.target.value }))} />
                               </div>
-                              <div>
+                              <div style={{ minWidth: 0 }}>
                                 <label style={s.fieldLabel}>Fim</label>
-                                <input type="time" style={s.inputEdit} value={formEditEvento.horaFim} onChange={e => setFormEditEvento(f => ({ ...f, horaFim: e.target.value }))} />
+                                <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEditEvento.horaFim} onChange={e => setFormEditEvento(f => ({ ...f, horaFim: e.target.value }))} />
                               </div>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
