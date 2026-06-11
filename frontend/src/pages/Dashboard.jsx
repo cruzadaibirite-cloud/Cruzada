@@ -71,6 +71,9 @@ export default function Dashboard() {
   const [buscaLocal, setBuscaLocal] = useState('')
   const [localSelecionado, setLocalSelecionado] = useState(null)
   const [viewLocais, setViewLocais] = useState('mapa')
+  const [modalNovoLocal, setModalNovoLocal] = useState(false)
+  const [formNovoLocal, setFormNovoLocal] = useState({ tipo: '', nome: '', endereco: '', bairro: '', regiao: '' })
+  const [salvandoLocal, setSalvandoLocal] = useState(false)
   const [menuMobileAberto, setMenuMobileAberto] = useState(false)
   const [tooltip, setTooltip] = useState(null)
   const [filtro, setFiltro] = useState(null)
@@ -207,6 +210,24 @@ export default function Dashboard() {
   async function carregarLocais() {
     const { data } = await supabase.from('locais').select('*').order('nome')
     setLocais(data || [])
+  }
+
+  async function salvarNovoLocal() {
+    if (!formNovoLocal.nome.trim()) return
+    setSalvandoLocal(true)
+    const { error } = await supabase.from('locais').insert({
+      tipo: formNovoLocal.tipo || null,
+      nome: formNovoLocal.nome,
+      endereco: formNovoLocal.endereco || null,
+      bairro: formNovoLocal.bairro || null,
+      regiao: formNovoLocal.regiao || null,
+    })
+    setSalvandoLocal(false)
+    if (!error) {
+      setModalNovoLocal(false)
+      setFormNovoLocal({ tipo: '', nome: '', endereco: '', bairro: '', regiao: '' })
+      carregarLocais()
+    }
   }
 
 
@@ -1611,7 +1632,7 @@ export default function Dashboard() {
                       </div>
                     )}
                     <div style={window.innerWidth < 768
-                      ? { padding: '24px 16px', flex: 1 }
+                      ? { padding: '24px 16px', flex: 1, overflow: 'hidden', boxSizing: 'border-box', width: '100%' }
                       : { background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative' }} onClick={e => e.stopPropagation()}>
                       {modalEvento.tipo === 'novo' ? (
                         <>
@@ -1628,12 +1649,12 @@ export default function Dashboard() {
                               <label style={s.fieldLabel}>Data</label>
                               <input type="date" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.data} onChange={e => setFormEvento(f => ({ ...f, data: e.target.value }))} />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', minWidth: 0 }}>
-                              <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+                              <div style={{ flex: '1 1 0', minWidth: 0 }}>
                                 <label style={s.fieldLabel}>Início</label>
                                 <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.horaInicio} onChange={e => setFormEvento(f => ({ ...f, horaInicio: e.target.value }))} />
                               </div>
-                              <div style={{ minWidth: 0 }}>
+                              <div style={{ flex: '1 1 0', minWidth: 0 }}>
                                 <label style={s.fieldLabel}>Fim</label>
                                 <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.horaFim} onChange={e => setFormEvento(f => ({ ...f, horaFim: e.target.value }))} />
                               </div>
@@ -1999,7 +2020,48 @@ export default function Dashboard() {
 
           {menu === 'locais' && (
             <>
-              <h2 style={s.pageTitle}>Locais</h2>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <h2 style={{ ...s.pageTitle, marginBottom: 0 }}>Locais</h2>
+                <button onClick={() => setModalNovoLocal(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff', border: 'none' }}>+ Novo local</button>
+              </div>
+
+              {modalNovoLocal && (
+                <div style={s.modalOverlay} onClick={() => setModalNovoLocal(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setModalNovoLocal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151' }}>✕</button>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '24px' }}>Novo local</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div>
+                        <label style={s.fieldLabel}>Nome *</label>
+                        <input style={s.inputEdit} value={formNovoLocal.nome} onChange={e => setFormNovoLocal(f => ({ ...f, nome: e.target.value }))} placeholder="Nome do local" autoFocus />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Tipo</label>
+                        <input style={s.inputEdit} value={formNovoLocal.tipo} onChange={e => setFormNovoLocal(f => ({ ...f, tipo: e.target.value }))} placeholder="Ex: Igreja, Escola..." />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Endereço</label>
+                        <input style={s.inputEdit} value={formNovoLocal.endereco} onChange={e => setFormNovoLocal(f => ({ ...f, endereco: e.target.value }))} placeholder="Rua, número..." />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div>
+                          <label style={s.fieldLabel}>Bairro</label>
+                          <input style={s.inputEdit} value={formNovoLocal.bairro} onChange={e => setFormNovoLocal(f => ({ ...f, bairro: e.target.value }))} placeholder="Bairro" />
+                        </div>
+                        <div>
+                          <label style={s.fieldLabel}>Região</label>
+                          <input style={s.inputEdit} value={formNovoLocal.regiao} onChange={e => setFormNovoLocal(f => ({ ...f, regiao: e.target.value }))} placeholder="Ex: Norte, Sul..." />
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                        <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => setModalNovoLocal(false)}>Cancelar</button>
+                        <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1, textAlign: 'center', border: 'none' }} onClick={salvarNovoLocal} disabled={salvandoLocal}>{salvandoLocal ? 'Salvando...' : 'Salvar'}</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div style={{ marginBottom: '16px', display: 'flex', gap: '8px' }}>
                 <button
                   title="Ver tabela"
