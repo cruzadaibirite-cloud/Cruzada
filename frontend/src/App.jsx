@@ -19,6 +19,7 @@ export default function App() {
         <Route path="/sistema/locais" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/agenda" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/evangelismo" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/sistema/pessoas" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/mapa" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       </Routes>
