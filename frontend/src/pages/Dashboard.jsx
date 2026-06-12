@@ -68,6 +68,10 @@ export default function Dashboard() {
   const [selected, setSelected] = useState(null)
   const [usuarios, setUsuarios] = useState([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [filtroUsuarioNome, setFiltroUsuarioNome] = useState('')
+  const [filtroUsuarioPerfil, setFiltroUsuarioPerfil] = useState('')
+  const [filtroUsuarioEquipe, setFiltroUsuarioEquipe] = useState('')
+  const [filtroUsuarioGrupo, setFiltroUsuarioGrupo] = useState('')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [perfilUsuario, setPerfilUsuario] = useState('')
@@ -301,8 +305,12 @@ export default function Dashboard() {
 
   async function carregarUsuarios() {
     setLoadingUsers(true)
-    const { data } = await supabase.from('usuarios').select('*').order('criado_em', { ascending: false })
-    setUsuarios(data || [])
+    const { data } = await supabase.from('usuarios').select('*, usuario_equipes(equipe_id), usuario_grupos(grupo_id)').order('criado_em', { ascending: false })
+    setUsuarios((data || []).map(u => ({
+      ...u,
+      equipes: (u.usuario_equipes || []).map(r => r.equipe_id),
+      grupos: (u.usuario_grupos || []).map(r => r.grupo_id),
+    })))
     setLoadingUsers(false)
   }
 
@@ -815,6 +823,10 @@ export default function Dashboard() {
           .pessoa-detalhe { padding: 20px 16px 90px !important; }
           .kanban-desktop { display: none !important; }
           .kanban-mobile { display: flex !important; }
+          .abordagem-pessoa-grid { grid-template-columns: 1fr !important; }
+          .dash-form-section { padding: 16px 14px !important; overflow: hidden; max-width: 100%; }
+          .dash-form-section input, .dash-form-section textarea { max-width: 100% !important; box-sizing: border-box !important; width: 100% !important; }
+          .usuarios-filtros { display: flex !important; }
         }
         @media (min-width: 769px) {
           .dash-bottomnav { display: none !important; }
@@ -1205,7 +1217,7 @@ export default function Dashboard() {
 
 
               {/* Seção: Dados Pessoais */}
-              <div style={s.formSection}>
+              <div style={s.formSection} className="dash-form-section">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '12px', borderBottom: '2px solid #F97310', lineHeight: 1 }}>
                   <h3 style={{ ...s.formSectionTitle, margin: 0, padding: 0, border: 'none' }}>Dados Pessoais</h3>
                   <div style={{ position: 'relative' }}>
@@ -1279,7 +1291,7 @@ export default function Dashboard() {
               </div>
 
               {/* Seção: Igreja */}
-              <div style={s.formSection}>
+              <div style={s.formSection} className="dash-form-section">
                 <h3 style={s.formSectionTitle}>Igreja</h3>
                 <div style={s.formGrid} className="dash-form-grid">
                   {editando ? (
@@ -1303,7 +1315,7 @@ export default function Dashboard() {
               </div>
 
               {/* Seção: Saúde e Experiência */}
-              <div style={s.formSection}>
+              <div style={s.formSection} className="dash-form-section">
                 <h3 style={s.formSectionTitle}>Saúde e Experiência</h3>
                 <div style={s.formGrid} className="dash-form-grid">
                   {editando ? (
@@ -1332,7 +1344,7 @@ export default function Dashboard() {
               </div>
 
               {/* Seção: Competências */}
-              <div style={s.formSection}>
+              <div style={s.formSection} className="dash-form-section">
                 <h3 style={s.formSectionTitle}>Competências</h3>
                 <div style={s.checkGrid} className="dash-check-grid">
                   {Object.entries(COMPETENCIAS_LABEL).map(([key, label]) => (
@@ -2604,7 +2616,7 @@ export default function Dashboard() {
                               <button onClick={() => setPessoas(p => p.filter((_, i) => i !== idx))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '16px', fontWeight: 700 }}>✕</button>
                             )}
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                          <div className="abordagem-pessoa-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                             <div>
                               <label style={s.fieldLabel}>Nome</label>
                               <input style={s.inputEdit} value={pessoa.nome} onChange={e => setPessoas(p => p.map((x, i) => i === idx ? { ...x, nome: e.target.value } : x))} />
@@ -2614,15 +2626,33 @@ export default function Dashboard() {
                               <input style={s.inputEdit} value={pessoa.telefone} onChange={e => setPessoas(p => p.map((x, i) => i === idx ? { ...x, telefone: e.target.value } : x))} />
                             </div>
                             <div style={{ position: 'relative' }}>
-                              <label style={s.fieldLabel}>Endereço (onde mora)</label>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <label style={{ ...s.fieldLabel, marginBottom: 0 }}>Endereço (onde mora)</label>
+                                <button type="button" onClick={async () => {
+                                  if (!navigator.geolocation) return
+                                  navigator.geolocation.getCurrentPosition(async ({ coords }) => {
+                                    try {
+                                      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`)
+                                      const data = await res.json()
+                                      const a = data.address
+                                      const end = [a.road, a.suburb || a.neighbourhood || a.quarter, a.city || a.town || a.municipality || a.village].filter(Boolean).join(', ')
+                                      setPessoas(p => p.map((x, i) => i === idx ? { ...x, endereco_pessoa: end } : x))
+                                      setPessoasConfirmadas(prev => ({ ...prev, [idx]: true }))
+                                      setSugestoesPessoa(prev => ({ ...prev, [idx]: [] }))
+                                    } catch {}
+                                  })
+                                }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontSize: '12px', fontWeight: 700, padding: 0, fontFamily: 'inherit' }}>
+                                  Preenchimento automático
+                                </button>
+                              </div>
                               <input
-                                style={s.inputEdit}
-                                placeholder="Digite e selecione uma opção"
+                                style={{ ...s.inputEdit, borderColor: pessoasConfirmadas[idx] ? '#e5e7eb' : pessoa.endereco_pessoa ? '#F97310' : '#e5e7eb' }}
+                                placeholder="Digite o endereço e selecione uma opção"
                                 value={pessoa.endereco_pessoa}
                                 onChange={e => buscarSugestoesPessoa(idx, e.target.value)}
                                 autoComplete="off"
                               />
-                              {(sugestoesPessoa[idx] || []).length > 0 && (
+                              {(sugestoesPessoa[idx] || []).length > 0 && !pessoasConfirmadas[idx] && (
                                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #e5e7eb', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 999, marginTop: '4px', overflow: 'hidden' }}>
                                   {(sugestoesPessoa[idx] || []).map((sug, i) => (
                                     <div key={i} onClick={() => selecionarEnderecoPessoa(idx, sug)}
@@ -2963,6 +2993,35 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* Busca e filtros */}
+              <div className="usuarios-filtros" style={{ display: 'none', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+                <input
+                  type="text"
+                  placeholder="Buscar por nome..."
+                  value={filtroUsuarioNome}
+                  onChange={e => setFiltroUsuarioNome(e.target.value)}
+                  style={{ flex: '1 1 180px', padding: '9px 14px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '14px', fontFamily: 'inherit', outline: 'none' }}
+                />
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select value={filtroUsuarioPerfil} onChange={e => setFiltroUsuarioPerfil(e.target.value)} style={{ flex: 1, padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
+                    <option value="">Perfil</option>
+                    <option value="admin">Admin</option>
+                    <option value="lider">Líder</option>
+                    <option value="voluntario">Voluntário</option>
+                    <option value="igreja">Igreja</option>
+                    <option value="prefeitura">Prefeitura</option>
+                  </select>
+                  <select value={filtroUsuarioEquipe} onChange={e => setFiltroUsuarioEquipe(e.target.value)} style={{ flex: 1, padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
+                    <option value="">Equipe</option>
+                    {equipes.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                  </select>
+                  <select value={filtroUsuarioGrupo} onChange={e => setFiltroUsuarioGrupo(e.target.value)} style={{ flex: 1, padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
+                    <option value="">Grupo</option>
+                    {grupos.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                  </select>
+                </div>
+              </div>
+
               {loadingUsers && <p style={s.info}>Carregando...</p>}
               {!loadingUsers && usuarios.length === 0 && <p style={s.info}>Nenhum usuário cadastrado.</p>}
               {selectedUsuario && (
@@ -3077,7 +3136,13 @@ export default function Dashboard() {
               )}
 
               <div style={s.cards}>
-                {usuarios.map(u => (
+                {usuarios.filter(u => {
+                  if (filtroUsuarioNome && !u.nome?.toLowerCase().includes(filtroUsuarioNome.toLowerCase())) return false
+                  if (filtroUsuarioPerfil && u.perfil !== filtroUsuarioPerfil) return false
+                  if (filtroUsuarioEquipe && !(u.equipes || []).includes(filtroUsuarioEquipe)) return false
+                  if (filtroUsuarioGrupo && !(u.grupos || []).includes(filtroUsuarioGrupo)) return false
+                  return true
+                }).map(u => (
                   <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={async () => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); setErroEquipeObrigatoria(false); const orgs = await carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos() }}>
                     <div style={s.cardAvatar}>{u.nome?.[0]?.toUpperCase()}</div>
                     <div style={s.cardInfo}>
@@ -3275,7 +3340,7 @@ function formField(label, value) {
   return (
     <div>
       <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: '#6b7280', marginBottom: '6px' }}>{label}</label>
-      <div style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', color: '#0f1117', background: '#f9fafb', minHeight: '40px' }}>
+      <div style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #e5e7eb', borderRadius: '8px', fontSize: '14px', color: '#0f1117', background: '#f9fafb', minHeight: '40px', wordBreak: 'break-word', overflowWrap: 'anywhere', boxSizing: 'border-box' }}>
         {value || '—'}
       </div>
     </div>
