@@ -11,8 +11,17 @@ const MENU = [
   { key: 'locais', label: 'Locais', path: '/sistema/locais' },
   { key: 'agenda', label: 'Agenda', path: '/sistema/agenda' },
   { key: 'evangelismo', label: 'Evangelismo', path: '/sistema/evangelismo' },
+  { key: 'pessoas', label: 'Pessoas', path: '/sistema/pessoas' },
   { key: 'mapa', label: 'Mapa', path: '/sistema/mapa' },
   { key: 'dashboard', label: 'Dashboard', path: '/sistema/dashboard' },
+]
+
+const KANBAN_COLUNAS = [
+  { key: 'sem_contato', label: 'Sem Contato', cor: '#7c3aed', bg: '#f5f3ff' },
+  { key: 'pendente', label: 'Pendente', cor: '#9ca3af', bg: '#f9fafb' },
+  { key: 'sem_resposta', label: 'Sem Resposta', cor: '#ef4444', bg: '#fef2f2' },
+  { key: 'contatado', label: 'Contato', cor: '#F97310', bg: '#fff4ec' },
+  { key: 'discipulado', label: 'Discipulado', cor: '#16a34a', bg: '#f0fdf4' },
 ]
 
 const CAMPOS_OBRIGATORIOS = [
@@ -53,7 +62,7 @@ export default function Dashboard() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : location.pathname === '/sistema/evangelismo' ? 'evangelismo' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
+  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : location.pathname === '/sistema/evangelismo' ? 'evangelismo' : location.pathname === '/sistema/pessoas' ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
   const [voluntarios, setVoluntarios] = useState([])
   const [loadingVol, setLoadingVol] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -132,9 +141,15 @@ export default function Dashboard() {
   const [editandoEvangelizado, setEditandoEvangelizado] = useState(null)
   const [formEditEvangelizado, setFormEditEvangelizado] = useState({})
   const [salvandoEvangelizado, setSalvandoEvangelizado] = useState(false)
+  const [sugestoesEditEvangelizado, setSugestoesEditEvangelizado] = useState([])
+  const [editEvangelizadoEnderecoConfirmado, setEditEvangelizadoEnderecoConfirmado] = useState(false)
+  const buscaEditEvangelizadoTimer = useRef(null)
   const [adicionandoPessoa, setAdicionandoPessoa] = useState(false)
   const [formNovaPessoa, setFormNovaPessoa] = useState({ nome: '', telefone: '', endereco_pessoa: '', observacao: '' })
   const [salvandoNovaPessoa, setSalvandoNovaPessoa] = useState(false)
+  const [sugestoesNovaPessoa, setSugestoesNovaPessoa] = useState([])
+  const [novaPessoaEnderecoConfirmado, setNovaPessoaEnderecoConfirmado] = useState(false)
+  const buscaNovaPessoaTimer = useRef(null)
   const [editandoAbordagem, setEditandoAbordagem] = useState(false)
   const [formEditAbordagem, setFormEditAbordagem] = useState({})
   const [salvandoEditAbordagem, setSalvandoEditAbordagem] = useState(false)
@@ -163,12 +178,58 @@ export default function Dashboard() {
     return () => { document.body.style.overflow = '' }
   }, [modalEvento])
 
+  const [pessoasKanban, setPessoasKanban] = useState([])
+  const [loadingPessoas, setLoadingPessoas] = useState(false)
+  const [dragPessoa, setDragPessoa] = useState(null)
+  const [dragOver, setDragOver] = useState(null)
+  const [acordeaoAberto, setAcordeaoAberto] = useState({})
+  const [modalPessoa, setModalPessoa] = useState(null)
+  const [obs2Value, setObs2Value] = useState('')
+  const [salvandoObs2, setSalvandoObs2] = useState(false)
+  const [dropStatus, setDropStatus] = useState(false)
+  const [showObs, setShowObs] = useState(false)
+  const [modalDependentes, setModalDependentes] = useState(null) // lista de pessoas recém-salvas
+  const [vinculosDependentes, setVinculosDependentes] = useState({}) // { idDependente: idResponsavel }
+  const [dependentesDaPessoa, setDependentesDaPessoa] = useState([])
+  const [dropEvangelizado, setDropEvangelizado] = useState(null)
+  const [modalVincularDependente, setModalVincularDependente] = useState(null)
+  const [novoResponsavelId, setNovoResponsavelId] = useState('')
+  const [confirmExcluirEvangelizado, setConfirmExcluirEvangelizado] = useState(null)
+  const [confirmExcluirAbordagem, setConfirmExcluirAbordagem] = useState(false)
+  const chatEndRef = useRef(null)
+
+  async function carregarPessoasKanban() {
+    setLoadingPessoas(true)
+    const { data } = await supabase.from('evangelizados').select('id, nome, telefone, observacao, observacao_2, status_contato, criado_em, abordagem_id, dependente, responsavel_id').order('criado_em', { ascending: false })
+    if (data) {
+      const atualizadas = await Promise.all(data.map(async p => {
+        if (!p.telefone && (p.status_contato || 'pendente') === 'pendente' && !p.dependente) {
+          await supabase.from('evangelizados').update({ status_contato: 'sem_contato' }).eq('id', p.id)
+          return { ...p, status_contato: 'sem_contato' }
+        }
+        return p
+      }))
+      // dependentes não aparecem no kanban
+      setPessoasKanban(atualizadas.filter(p => !p.dependente))
+    }
+    setLoadingPessoas(false)
+  }
+
+  async function moverPessoa(id, novoStatus) {
+    const { error } = await supabase.from('evangelizados').update({ status_contato: novoStatus, data_contato: new Date().toISOString() }).eq('id', id)
+    if (error) { console.error('Erro ao mover pessoa:', error); alert('Erro ao salvar: ' + error.message); return }
+    setPessoasKanban(list => list.map(p => p.id === id ? { ...p, status_contato: novoStatus } : p))
+    // atualiza dependentes
+    await supabase.from('evangelizados').update({ status_contato: novoStatus, data_contato: new Date().toISOString() }).eq('responsavel_id', id).eq('dependente', true)
+  }
+
   useEffect(() => {
     if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'locais' || menu === 'agenda') carregarLocais()
     if (menu === 'agenda') { carregarEventos(); carregarEquipes() }
     if (menu === 'evangelismo') { carregarAbordagens(); carregarEquipes(); if (user?.id) carregarOrgsUsuario(user.id) }
+    if (menu === 'pessoas') carregarPessoasKanban()
     if (menu === 'mapa') carregarAbordagensComTotal()
   }, [menu])
 
@@ -472,6 +533,14 @@ export default function Dashboard() {
     if (!error) {
       setModalAbordagem(false)
       setFormAbordagem({ local: '', endereco: '', data_hora: '', observacao: '' })
+      // busca as pessoas recém-salvas para o modal de dependentes
+      if (pessoasValidas.length > 1) {
+        const { data: pessoasSalvas } = await supabase.from('evangelizados').select('id, nome').in('nome', pessoasValidas.map(p => p.nome)).order('criado_em', { ascending: false }).limit(pessoasValidas.length)
+        if (pessoasSalvas && pessoasSalvas.length > 1) {
+          setVinculosDependentes({})
+          setModalDependentes(pessoasSalvas)
+        }
+      }
       setPessoas([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '' }])
       carregarAbordagens()
     }
@@ -606,6 +675,15 @@ export default function Dashboard() {
     }
   }
 
+  async function salvarVinculosDependentes() {
+    const entradas = Object.entries(vinculosDependentes)
+    await Promise.all(entradas.map(([dependenteId, responsavelId]) =>
+      supabase.from('evangelizados').update({ dependente: true, responsavel_id: responsavelId }).eq('id', dependenteId)
+    ))
+    setModalDependentes(null)
+    setVinculosDependentes({})
+  }
+
   async function atualizarStatusEvangelizado(id, status) {
     await supabase.from('evangelizados').update({ status_contato: status, data_contato: new Date().toISOString() }).eq('id', id)
     setEvangelizados(list => list.map(e => e.id === id ? { ...e, status_contato: status } : e))
@@ -727,6 +805,9 @@ export default function Dashboard() {
           .dash-check-grid { grid-template-columns: 1fr !important; }
           .dash-form-grid { grid-template-columns: 1fr !important; }
           .dash-faixa-etaria { margin-bottom: 24px !important; }
+          .pessoa-detalhe { padding: 20px 16px 90px !important; }
+          .kanban-desktop { display: none !important; }
+          .kanban-mobile { display: flex !important; }
         }
         @media (min-width: 769px) {
           .dash-bottomnav { display: none !important; }
@@ -2020,10 +2101,7 @@ export default function Dashboard() {
 
           {menu === 'locais' && (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <h2 style={{ ...s.pageTitle, marginBottom: 0 }}>Locais</h2>
-                <button onClick={() => setModalNovoLocal(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff', border: 'none' }}>+ Novo local</button>
-              </div>
+              <h2 style={s.pageTitle}>Locais</h2>
 
               {modalNovoLocal && (
                 <div style={s.modalOverlay} onClick={() => setModalNovoLocal(false)}>
@@ -2043,15 +2121,9 @@ export default function Dashboard() {
                         <label style={s.fieldLabel}>Endereço</label>
                         <input style={s.inputEdit} value={formNovoLocal.endereco} onChange={e => setFormNovoLocal(f => ({ ...f, endereco: e.target.value }))} placeholder="Rua, número..." />
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                        <div>
-                          <label style={s.fieldLabel}>Bairro</label>
-                          <input style={s.inputEdit} value={formNovoLocal.bairro} onChange={e => setFormNovoLocal(f => ({ ...f, bairro: e.target.value }))} placeholder="Bairro" />
-                        </div>
-                        <div>
-                          <label style={s.fieldLabel}>Região</label>
-                          <input style={s.inputEdit} value={formNovoLocal.regiao} onChange={e => setFormNovoLocal(f => ({ ...f, regiao: e.target.value }))} placeholder="Ex: Norte, Sul..." />
-                        </div>
+                      <div>
+                        <label style={s.fieldLabel}>Bairro</label>
+                        <input style={s.inputEdit} value={formNovoLocal.bairro} onChange={e => setFormNovoLocal(f => ({ ...f, bairro: e.target.value }))} placeholder="Bairro" />
                       </div>
                       <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                         <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => setModalNovoLocal(false)}>Cancelar</button>
@@ -2076,6 +2148,7 @@ export default function Dashboard() {
                   value={buscaLocal}
                   onChange={e => setBuscaLocal(e.target.value)}
                 />
+                <button onClick={() => setModalNovoLocal(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff', border: 'none', flexShrink: 0 }}>+ Novo local</button>
               </div>
 
               {buscaLocal.length > 0 && buscaLocal !== localSelecionado?.nome && (
@@ -2141,6 +2214,265 @@ export default function Dashboard() {
             </>
           )}
 
+          {menu === 'pessoas' && (
+            <>
+              {modalPessoa ? (
+                /* ── Tela de detalhes da pessoa ── */
+                <div className="pessoa-detalhe" style={{ display: 'flex', flexDirection: 'column', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: '32px 32px 24px' }}>
+                  {/* Cabeçalho */}
+                  <div style={{ marginBottom: '16px' }}>
+                    <button onClick={() => setModalPessoa(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit', marginBottom: '8px' }}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                      Voltar
+                    </button>
+                    <h2 style={{ fontSize: '22px', fontWeight: 900, color: '#0f1117', margin: 0 }}>{modalPessoa.nome}</h2>
+                  </div>
+
+                  {/* Status + Telefone */}
+                  {(() => {
+                    const col = KANBAN_COLUNAS.find(c => c.key === (modalPessoa.status_contato || 'pendente'))
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <div style={{ position: 'relative' }}>
+                          <button onClick={() => setDropStatus(o => !o)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '99px', border: 'none', background: col.cor, color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '12px' }}>
+                            {col.label} <span style={{ fontSize: '10px' }}>▾</span>
+                          </button>
+                          {dropStatus && (
+                            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, overflow: 'hidden', minWidth: '160px' }}>
+                              {KANBAN_COLUNAS.map(c => (
+                                <div key={c.key} onClick={async () => {
+                                  setDropStatus(false)
+                                  if (c.key === (modalPessoa.status_contato || 'pendente')) return
+                                  await moverPessoa(modalPessoa.id, c.key)
+                                  setModalPessoa(prev => ({ ...prev, status_contato: c.key }))
+                                }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', cursor: 'pointer', background: c.key === (modalPessoa.status_contato || 'pendente') ? c.bg : '#fff' }}
+                                  onMouseEnter={e => e.currentTarget.style.background = c.bg}
+                                  onMouseLeave={e => e.currentTarget.style.background = c.key === (modalPessoa.status_contato || 'pendente') ? c.bg : '#fff'}>
+                                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.cor, flexShrink: 0 }} />
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: c.cor }}>{c.label}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {modalPessoa.observacao && (
+                          <button onClick={() => setShowObs(o => !o)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '99px', border: 'none', background: showObs ? '#374151' : '#f3f4f6', color: showObs ? '#fff' : '#374151', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '12px' }}>
+                            Observação
+                          </button>
+                        )}
+                        {modalPessoa.telefone && (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '99px', background: '#f3f4f6', color: '#374151', fontWeight: 700, fontSize: '12px' }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+                            {modalPessoa.telefone}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Dependentes */}
+                  {dependentesDaPessoa.length > 0 && (
+                    <div style={{ background: '#f0fdf4', borderRadius: '10px', padding: '10px 14px', marginBottom: '12px', border: '1px solid #bbf7d0' }}>
+                      <div style={{ fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>
+                        {modalPessoa.nome} tem {dependentesDaPessoa.length === 1 ? 'uma pessoa dependente' : `${dependentesDaPessoa.length} pessoas dependentes`}: {dependentesDaPessoa.map(d => d.nome).join(', ')}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Observação original */}
+                  {modalPessoa.observacao && showObs && (
+                    <div style={{ background: '#f9fafb', borderRadius: '10px', padding: '10px 14px', marginBottom: '12px' }}>
+                      <div style={{ fontSize: '13px', color: '#374151' }}>{modalPessoa.observacao}</div>
+                    </div>
+                  )}
+
+                  {/* Chat histórico */}
+                  {(() => {
+                    let anotacoes = []
+                    try { anotacoes = modalPessoa.observacao_2 ? JSON.parse(modalPessoa.observacao_2) : [] } catch { anotacoes = [] }
+                    setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, 50)
+                    return (
+                      <div style={{ flex: '1 1 0', minHeight: 0, background: '#f9fafb', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {anotacoes.length === 0 && (
+                          <div style={{ fontSize: '13px', color: '#d1d5db', textAlign: 'center', margin: 'auto' }}>Sem anotações ainda</div>
+                        )}
+                        {anotacoes.map((a, i) => (
+                          <div key={i} style={{ background: '#fff', borderRadius: '10px', padding: '10px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#F97310' }}>{a.autor}</span>
+                              <span style={{ fontSize: '10px', color: '#9ca3af' }}>{new Date(a.data).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                            </div>
+                            <div style={{ fontSize: '14px', color: '#374151' }}>{a.texto}</div>
+                          </div>
+                        ))}
+                        <div ref={chatEndRef} />
+                      </div>
+                    )
+                  })()}
+
+                  {/* Input enviar */}
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                    <input
+                      type="text"
+                      style={{ flex: 1, padding: '12px 16px', borderRadius: '12px', border: '1.5px solid #e5e7eb', fontSize: '14px', fontFamily: 'inherit', outline: 'none', background: '#fff' }}
+                      value={obs2Value}
+                      onChange={e => setObs2Value(e.target.value)}
+                      onKeyDown={async e => {
+                        if (e.key === 'Enter' && obs2Value.trim() && !salvandoObs2) {
+                          setSalvandoObs2(true)
+                          let anotacoes = []
+                          try { anotacoes = modalPessoa.observacao_2 ? JSON.parse(modalPessoa.observacao_2) : [] } catch { anotacoes = [] }
+                          const nova = { autor: nomeUsuario, texto: obs2Value.trim(), data: new Date().toISOString() }
+                          const novaLista = [...anotacoes, nova]
+                          const valor = JSON.stringify(novaLista)
+                          await supabase.from('evangelizados').update({ observacao_2: valor }).eq('id', modalPessoa.id)
+                          setPessoasKanban(list => list.map(p => p.id === modalPessoa.id ? { ...p, observacao_2: valor } : p))
+                          setModalPessoa(prev => ({ ...prev, observacao_2: valor }))
+                          setObs2Value('')
+                          setSalvandoObs2(false)
+                        }
+                      }}
+                      placeholder="Escreva uma anotação..."
+                    />
+                    <button
+                      disabled={salvandoObs2 || !obs2Value.trim()}
+                      onClick={async () => {
+                        setSalvandoObs2(true)
+                        let anotacoes = []
+                        try { anotacoes = modalPessoa.observacao_2 ? JSON.parse(modalPessoa.observacao_2) : [] } catch { anotacoes = [] }
+                        const nova = { autor: nomeUsuario, texto: obs2Value.trim(), data: new Date().toISOString() }
+                        const novaLista = [...anotacoes, nova]
+                        const valor = JSON.stringify(novaLista)
+                        await supabase.from('evangelizados').update({ observacao_2: valor }).eq('id', modalPessoa.id)
+                        setPessoasKanban(list => list.map(p => p.id === modalPessoa.id ? { ...p, observacao_2: valor } : p))
+                        setModalPessoa(prev => ({ ...prev, observacao_2: valor }))
+                        setObs2Value('')
+                        setSalvandoObs2(false)
+                      }}
+                      style={{ padding: '12px 18px', borderRadius: '12px', border: 'none', background: '#F97310', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '14px', flexShrink: 0 }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    </button>
+                  </div>
+
+                  {/* Botões de ação */}
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    {modalPessoa.telefone ? (
+                      <a
+                        href={`https://wa.me/55${modalPessoa.telefone.replace(/\D/g, '')}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#22c55e', color: '#fff', borderRadius: '12px', padding: '12px', fontWeight: 700, fontSize: '14px', textDecoration: 'none', fontFamily: 'inherit' }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        WhatsApp
+                      </a>
+                    ) : (
+                      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', borderRadius: '12px', padding: '12px', fontSize: '14px', color: '#9ca3af', fontWeight: 600 }}>
+                        Sem telefone
+                      </div>
+                    )}
+                    <button
+                      onClick={async () => {
+                        const { data } = await supabase.from('abordagens').select('*, usuarios(nome), equipes(nome)').eq('id', modalPessoa.abordagem_id).single()
+                        if (data) { setAbordagemSelecionada(data); carregarEvangelizados(data.id) }
+                        setModalPessoa(null)
+                        navigate('/sistema/evangelismo')
+                      }}
+                      style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '12px', padding: '12px', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      Ver abordagem
+                    </button>
+                  </div>
+                </div>
+              ) : (
+              /* ── Kanban ── */
+              <>
+              <h2 style={s.pageTitle}>Pessoas</h2>
+              {loadingPessoas && <p style={s.info}>Carregando...</p>}
+              {!loadingPessoas && (
+                <>
+                  {/* Desktop: colunas horizontais */}
+                  <div className="kanban-desktop" style={{ display: 'flex', gap: '10px', paddingBottom: '16px', alignItems: 'flex-start' }}>
+                    {KANBAN_COLUNAS.map(col => {
+                      const cartoes = pessoasKanban.filter(p => (p.status_contato || 'pendente') === col.key)
+                      return (
+                        <div key={col.key}
+                          onDragOver={e => { e.preventDefault(); setDragOver(col.key) }}
+                          onDrop={e => { e.preventDefault(); if (dragPessoa && dragPessoa.status !== col.key) moverPessoa(dragPessoa.id, col.key); setDragPessoa(null); setDragOver(null) }}
+                          onDragLeave={() => setDragOver(null)}
+                          style={{ flex: '1 1 0', minWidth: 0, background: dragOver === col.key ? col.bg : '#f3f4f6', borderRadius: '14px', padding: '10px', border: dragOver === col.key ? `2px solid ${col.cor}` : '2px solid transparent', transition: 'border 0.15s' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: col.cor }} />
+                            <span style={{ fontSize: '13px', fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{col.label}</span>
+                            <span style={{ marginLeft: 'auto', fontSize: '12px', fontWeight: 700, color: col.cor, background: col.bg, borderRadius: '99px', padding: '2px 8px' }}>{cartoes.length}</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {cartoes.map(p => (
+                              <div key={p.id}
+                                draggable
+                                onDragStart={() => setDragPessoa({ id: p.id, status: p.status_contato || 'pendente' })}
+                                onDragEnd={() => { setDragPessoa(null); setDragOver(null) }}
+                                onClick={async () => { setModalPessoa(p); setObs2Value(''); setShowObs(false); const { data: deps } = await supabase.from('evangelizados').select('id, nome').eq('responsavel_id', p.id).eq('dependente', true); setDependentesDaPessoa(deps || []) }}
+                                style={{ background: '#fff', borderRadius: '10px', padding: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', cursor: 'grab', borderLeft: `3px solid ${col.cor}` }}>
+                                <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117', marginBottom: '4px' }}>{p.nome}</div>
+                                {p.telefone && <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>{p.telefone}</div>}
+                                {p.observacao && <div style={{ fontSize: '11px', color: '#9ca3af' }}>{p.observacao}</div>}
+                              </div>
+                            ))}
+                            {cartoes.length === 0 && (
+                              <div style={{ textAlign: 'center', padding: '24px 0', color: '#d1d5db', fontSize: '13px', fontWeight: 600 }}>Nenhuma pessoa</div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Mobile: acordeão */}
+                  <div className="kanban-mobile" style={{ display: 'none', flexDirection: 'column', gap: '8px', paddingBottom: '16px' }}>
+                    {KANBAN_COLUNAS.map(col => {
+                      const cartoes = pessoasKanban.filter(p => (p.status_contato || 'pendente') === col.key)
+                      const aberto = !!acordeaoAberto[col.key]
+                      return (
+                        <div key={col.key} style={{ borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${aberto ? col.cor : '#e5e7eb'}`, background: '#fff' }}>
+                          <button
+                            onClick={() => setAcordeaoAberto(o => ({ ...o, [col.key]: !o[col.key] }))}
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: col.cor, flexShrink: 0 }} />
+                            <span style={{ fontSize: '14px', fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.5px', flex: 1, textAlign: 'left' }}>{col.label}</span>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: col.cor, background: col.bg, borderRadius: '99px', padding: '2px 8px' }}>{cartoes.length}</span>
+                            <span style={{ fontSize: '12px', color: '#9ca3af', marginLeft: '4px' }}>{aberto ? '▼' : '►'}</span>
+                          </button>
+                          {aberto && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 12px 12px' }}>
+                              {cartoes.length === 0 && (
+                                <div style={{ textAlign: 'center', padding: '16px 0', color: '#d1d5db', fontSize: '13px', fontWeight: 600 }}>Nenhuma pessoa</div>
+                              )}
+                              {cartoes.map(p => (
+                                <div key={p.id}
+                                  onClick={async () => { setModalPessoa(p); setObs2Value(''); setShowObs(false); const { data: deps } = await supabase.from('evangelizados').select('id, nome').eq('responsavel_id', p.id).eq('dependente', true); setDependentesDaPessoa(deps || []) }}
+                                  style={{ background: '#f9fafb', borderRadius: '10px', padding: '12px 14px', cursor: 'pointer', borderLeft: `3px solid ${col.cor}` }}>
+                                  <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117', marginBottom: '2px' }}>{p.nome}</div>
+                                  {p.telefone && <div style={{ fontSize: '12px', color: '#6b7280' }}>{p.telefone}</div>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+              </>
+              )}
+            </>
+          )}
+
           {menu === 'mapa' && (
             <>
               <h2 style={{ ...s.pageTitle, marginBottom: '20px' }}>Mapa de Evangelismo</h2>
@@ -2151,6 +2483,107 @@ export default function Dashboard() {
           {menu === 'evangelismo' && (
             <>
               {/* Modal nova abordagem */}
+              {/* Modal confirmar exclusão de abordagem */}
+              {confirmExcluirAbordagem && (
+                <div style={s.modalOverlay} onClick={() => setConfirmExcluirAbordagem(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', padding: '28px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '8px' }}>Excluir abordagem</h3>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Tem certeza que deseja excluir esta abordagem? Todas as pessoas vinculadas também serão removidas. Esta ação não pode ser desfeita.</p>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => setConfirmExcluirAbordagem(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                      <button onClick={async () => {
+                        await supabase.from('evangelizados').delete().eq('abordagem_id', abordagemSelecionada.id)
+                        await supabase.from('abordagens').delete().eq('id', abordagemSelecionada.id)
+                        setAbordagens(list => list.filter(a => a.id !== abordagemSelecionada.id))
+                        setAbordagemSelecionada(null)
+                        setEditandoAbordagem(false)
+                        setConfirmExcluirAbordagem(false)
+                      }} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Excluir</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal confirmar exclusão de evangelizado */}
+              {confirmExcluirEvangelizado && (
+                <div style={s.modalOverlay} onClick={() => setConfirmExcluirEvangelizado(null)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', padding: '28px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '8px' }}>Excluir pessoa</h3>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Tem certeza que deseja excluir <strong>{confirmExcluirEvangelizado.nome}</strong>? Esta ação não pode ser desfeita.</p>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => setConfirmExcluirEvangelizado(null)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                      <button onClick={async () => {
+                        await supabase.from('evangelizados').delete().eq('id', confirmExcluirEvangelizado.id)
+                        setEvangelizados(list => list.filter(e => e.id !== confirmExcluirEvangelizado.id))
+                        setEditandoEvangelizado(null)
+                        setConfirmExcluirEvangelizado(null)
+                      }} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Excluir</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal vincular dependente individual */}
+              {modalVincularDependente && (
+                <div style={s.modalOverlay} onClick={() => setModalVincularDependente(null)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '28px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '8px' }}>{modalVincularDependente.nome}</h3>
+                    <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Selecione o responsável ou deixe em branco para independente.</p>
+                    <select
+                      value={novoResponsavelId}
+                      onChange={e => setNovoResponsavelId(e.target.value)}
+                      style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '14px', fontFamily: 'inherit', background: '#fff', color: '#374151', marginBottom: '20px' }}>
+                      <option value="">— Independente —</option>
+                      {evangelizados.filter(e => e.id !== modalVincularDependente.id).map(e => (
+                        <option key={e.id} value={e.id}>{e.nome}</option>
+                      ))}
+                    </select>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => setModalVincularDependente(null)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                      <button onClick={async () => {
+                        if (novoResponsavelId) {
+                          await supabase.from('evangelizados').update({ dependente: true, responsavel_id: novoResponsavelId }).eq('id', modalVincularDependente.id)
+                        } else {
+                          await supabase.from('evangelizados').update({ dependente: false, responsavel_id: null }).eq('id', modalVincularDependente.id)
+                        }
+                        setEvangelizados(list => list.map(e => e.id === modalVincularDependente.id ? { ...e, dependente: !!novoResponsavelId, responsavel_id: novoResponsavelId || null } : e))
+                        setModalVincularDependente(null)
+                      }} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#F97310', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Salvar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal de vínculos de dependentes */}
+              {modalDependentes && (
+                <div style={s.modalOverlay} onClick={() => setModalDependentes(null)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '440px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '8px' }}>Alguma pessoa é dependente de outra?</h3>
+                    <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Selecione o responsável de cada dependente. Deixe em branco quem for independente.</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+                      {modalDependentes.map(p => (
+                        <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <span style={{ flex: 1, fontSize: '14px', fontWeight: 700, color: '#0f1117' }}>{p.nome}</span>
+                          <span style={{ fontSize: '13px', color: '#9ca3af' }}>depende de</span>
+                          <select
+                            value={vinculosDependentes[p.id] || ''}
+                            onChange={e => setVinculosDependentes(v => ({ ...v, [p.id]: e.target.value || undefined }))}
+                            style={{ padding: '6px 10px', borderRadius: '8px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff', color: '#374151' }}>
+                            <option value="">— Independente —</option>
+                            {modalDependentes.filter(o => o.id !== p.id).map(o => (
+                              <option key={o.id} value={o.id}>{o.nome}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={salvarVinculosDependentes} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: '#F97310', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Salvar vínculos</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {modalAbordagem && (
                 <div style={s.modalOverlay} onClick={() => { setModalAbordagem(false); setSugestoesEndereco([]); setEnderecoConfirmado(false); setErroAbordagem('') }}>
                   <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '960px', padding: '24px 32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', maxHeight: '70vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -2272,6 +2705,7 @@ export default function Dashboard() {
                         <div><label style={s.fieldLabel}>Data e hora</label><input style={s.inputEdit} type="datetime-local" value={formEditAbordagem.data_hora || ''} onChange={e => setFormEditAbordagem(f => ({ ...f, data_hora: e.target.value }))} /></div>
                         <div><label style={s.fieldLabel}>Observação</label><textarea style={{ ...s.inputEdit, minHeight: '60px', resize: 'vertical' }} value={formEditAbordagem.observacao || ''} onChange={e => setFormEditAbordagem(f => ({ ...f, observacao: e.target.value }))} /></div>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button style={{ ...s.editBtn, background: '#ef4444', color: '#fff', border: 'none' }} onClick={() => setConfirmExcluirAbordagem(true)}>Excluir</button>
                           <button style={s.backBtn} onClick={() => setEditandoAbordagem(false)}>Cancelar</button>
                           <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarEdicaoAbordagem} disabled={salvandoEditAbordagem}>{salvandoEditAbordagem ? 'Salvando...' : 'Salvar'}</button>
                         </div>
@@ -2315,11 +2749,49 @@ export default function Dashboard() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                               <div><label style={s.fieldLabel}>Nome</label><input style={s.inputEdit} value={formEditEvangelizado.nome || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, nome: e.target.value }))} /></div>
                               <div><label style={s.fieldLabel}>Telefone</label><input style={s.inputEdit} value={formEditEvangelizado.telefone || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, telefone: e.target.value }))} /></div>
-                              <div><label style={s.fieldLabel}>Endereço</label><input style={s.inputEdit} value={formEditEvangelizado.endereco_pessoa || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, endereco_pessoa: e.target.value }))} /></div>
-                              <div><label style={s.fieldLabel}>Observação</label><input style={s.inputEdit} value={formEditEvangelizado.observacao || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, observacao: e.target.value }))} /></div>
                             </div>
+                            <div style={{ position: 'relative' }}>
+                              <label style={s.fieldLabel}>Endereço (onde mora)</label>
+                              <input
+                                style={{ ...s.inputEdit, borderColor: editEvangelizadoEnderecoConfirmado ? '#e5e7eb' : formEditEvangelizado.endereco_pessoa ? '#F97310' : '#e5e7eb' }}
+                                placeholder="Digite e selecione uma opção"
+                                value={formEditEvangelizado.endereco_pessoa || ''}
+                                onChange={e => {
+                                  const txt = e.target.value
+                                  setFormEditEvangelizado(f => ({ ...f, endereco_pessoa: txt }))
+                                  setEditEvangelizadoEnderecoConfirmado(false)
+                                  clearTimeout(buscaEditEvangelizadoTimer.current)
+                                  if (txt.length < 4) { setSugestoesEditEvangelizado([]); return }
+                                  buscaEditEvangelizadoTimer.current = setTimeout(async () => {
+                                    try {
+                                      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(txt)}&format=json&limit=5&addressdetails=1`)
+                                      const data = await res.json()
+                                      setSugestoesEditEvangelizado(data.map(d => {
+                                        const a = d.address
+                                        return [a.road, a.suburb || a.neighbourhood || a.quarter, a.city || a.town || a.municipality || a.village].filter(Boolean).join(', ')
+                                      }))
+                                    } catch { setSugestoesEditEvangelizado([]) }
+                                  }, 400)
+                                }}
+                              />
+                              {sugestoesEditEvangelizado.length > 0 && !editEvangelizadoEnderecoConfirmado && (
+                                <div style={{ position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 300 }}>
+                                  {sugestoesEditEvangelizado.map((sg, i) => (
+                                    <div key={i} onMouseDown={() => { setFormEditEvangelizado(f => ({ ...f, endereco_pessoa: sg })); setSugestoesEditEvangelizado([]); setEditEvangelizadoEnderecoConfirmado(true) }}
+                                      style={{ padding: '10px 14px', fontSize: '13px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', color: '#0f1117' }}
+                                      onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                                      {sg}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div><label style={s.fieldLabel}>Observação</label><input style={s.inputEdit} value={formEditEvangelizado.observacao || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, observacao: e.target.value }))} /></div>
                             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                              <button style={s.backBtn} onClick={() => { setEditandoEvangelizado(null); setFormEditEvangelizado({}) }}>Cancelar</button>
+                              <button style={{ ...s.editBtn, background: '#ef4444', color: '#fff', border: 'none' }} onClick={() => setConfirmExcluirEvangelizado(ev)}>Excluir</button>
+                              <button style={{ ...s.editBtn, background: '#0f1117', color: '#fff', border: 'none' }} onClick={() => { setEditandoEvangelizado(null); setModalVincularDependente(ev); setNovoResponsavelId(ev.responsavel_id || '') }}>Vincular</button>
+                              <button style={s.backBtn} onClick={() => { setEditandoEvangelizado(null); setFormEditEvangelizado({}); setSugestoesEditEvangelizado([]); setEditEvangelizadoEnderecoConfirmado(false) }}>Cancelar</button>
                               <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarEdicaoEvangelizado} disabled={salvandoEvangelizado}>{salvandoEvangelizado ? 'Salvando...' : 'Salvar'}</button>
                             </div>
                           </div>
@@ -2334,7 +2806,7 @@ export default function Dashboard() {
                               </div>
                               {(perfilUsuario === 'admin' || abordagemSelecionada.usuario_id === user?.id) && (
                                 <button
-                                  onClick={() => { setEditandoEvangelizado(ev.id); setFormEditEvangelizado({ nome: ev.nome, telefone: ev.telefone, endereco_pessoa: ev.endereco_pessoa, observacao: ev.observacao }) }}
+                                  onClick={() => { setEditandoEvangelizado(ev.id); setFormEditEvangelizado({ nome: ev.nome, telefone: ev.telefone, endereco_pessoa: ev.endereco_pessoa, observacao: ev.observacao }); setSugestoesEditEvangelizado([]); setEditEvangelizadoEnderecoConfirmado(true) }}
                                   style={{ background: '#fff', border: 'none', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 700, color: '#0f1117', cursor: 'pointer', fontFamily: 'inherit' }}
                                 >Editar</button>
                               )}
@@ -2353,14 +2825,52 @@ export default function Dashboard() {
                   {(perfilUsuario === 'admin' || abordagemSelecionada.usuario_id === user?.id) && (
                     adicionandoPessoa ? (
                       <div style={{ background: '#fff', borderRadius: '12px', padding: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginTop: '8px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                          <div><label style={s.fieldLabel}>Nome</label><input style={s.inputEdit} placeholder="Nome" value={formNovaPessoa.nome} onChange={e => setFormNovaPessoa(f => ({ ...f, nome: e.target.value }))} /></div>
-                          <div><label style={s.fieldLabel}>Telefone</label><input style={s.inputEdit} placeholder="Telefone" value={formNovaPessoa.telefone} onChange={e => setFormNovaPessoa(f => ({ ...f, telefone: e.target.value }))} /></div>
-                          <div><label style={s.fieldLabel}>Endereço</label><input style={s.inputEdit} placeholder="Endereço" value={formNovaPessoa.endereco_pessoa} onChange={e => setFormNovaPessoa(f => ({ ...f, endereco_pessoa: e.target.value }))} /></div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '10px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            <div><label style={s.fieldLabel}>Nome</label><input style={s.inputEdit} placeholder="Nome" value={formNovaPessoa.nome} onChange={e => setFormNovaPessoa(f => ({ ...f, nome: e.target.value }))} /></div>
+                            <div><label style={s.fieldLabel}>Telefone</label><input style={s.inputEdit} placeholder="Telefone" value={formNovaPessoa.telefone} onChange={e => setFormNovaPessoa(f => ({ ...f, telefone: e.target.value }))} /></div>
+                          </div>
+                          <div style={{ position: 'relative' }}>
+                            <label style={s.fieldLabel}>Endereço (onde mora)</label>
+                            <input
+                              style={{ ...s.inputEdit, borderColor: novaPessoaEnderecoConfirmado ? '#e5e7eb' : formNovaPessoa.endereco_pessoa ? '#F97310' : '#e5e7eb' }}
+                              placeholder="Digite e selecione uma opção"
+                              value={formNovaPessoa.endereco_pessoa}
+                              onChange={e => {
+                                const txt = e.target.value
+                                setFormNovaPessoa(f => ({ ...f, endereco_pessoa: txt }))
+                                setNovaPessoaEnderecoConfirmado(false)
+                                clearTimeout(buscaNovaPessoaTimer.current)
+                                if (txt.length < 4) { setSugestoesNovaPessoa([]); return }
+                                buscaNovaPessoaTimer.current = setTimeout(async () => {
+                                  try {
+                                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(txt)}&format=json&limit=5&addressdetails=1`)
+                                    const data = await res.json()
+                                    setSugestoesNovaPessoa(data.map(d => {
+                                      const a = d.address
+                                      return [a.road, a.suburb || a.neighbourhood || a.quarter, a.city || a.town || a.municipality || a.village].filter(Boolean).join(', ')
+                                    }))
+                                  } catch { setSugestoesNovaPessoa([]) }
+                                }, 400)
+                              }}
+                            />
+                            {sugestoesNovaPessoa.length > 0 && !novaPessoaEnderecoConfirmado && (
+                              <div style={{ position: 'absolute', top: 'calc(100% + 2px)', left: 0, right: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 300 }}>
+                                {sugestoesNovaPessoa.map((s, i) => (
+                                  <div key={i} onMouseDown={() => { setFormNovaPessoa(f => ({ ...f, endereco_pessoa: s })); setSugestoesNovaPessoa([]); setNovaPessoaEnderecoConfirmado(true) }}
+                                    style={{ padding: '10px 14px', fontSize: '13px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', color: '#0f1117' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                                    {s}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <div><label style={s.fieldLabel}>Observação</label><input style={s.inputEdit} placeholder="Observação" value={formNovaPessoa.observacao} onChange={e => setFormNovaPessoa(f => ({ ...f, observacao: e.target.value }))} /></div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button style={{ ...s.backBtn, background: '#9ca3af', border: 'none', color: '#fff' }} onClick={() => { setAdicionandoPessoa(false); setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '' }) }}>Cancelar</button>
+                          <button style={{ ...s.backBtn, background: '#9ca3af', border: 'none', color: '#fff' }} onClick={() => { setAdicionandoPessoa(false); setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '' }); setSugestoesNovaPessoa([]); setNovaPessoaEnderecoConfirmado(false) }}>Cancelar</button>
                           <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarNovaPessoa} disabled={salvandoNovaPessoa}>{salvandoNovaPessoa ? 'Salvando...' : 'Salvar'}</button>
                         </div>
                       </div>
@@ -2926,6 +3436,7 @@ const s = {
     paddingBottom: '40px',
     overflowY: 'auto',
     minHeight: 0,
+    position: 'relative',
   },
   pageTitle: {
     fontSize: '22px',
