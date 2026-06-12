@@ -201,6 +201,7 @@ export default function Dashboard() {
   const [confirmExcluirEvangelizado, setConfirmExcluirEvangelizado] = useState(null)
   const [confirmExcluirAbordagem, setConfirmExcluirAbordagem] = useState(false)
   const chatEndRef = useRef(null)
+  const mapaLocalRef = useRef(null)
 
   async function carregarPessoasKanban() {
     setLoadingPessoas(true)
@@ -832,6 +833,7 @@ export default function Dashboard() {
           .dash-bottomnav { display: none !important; }
           .agenda-mobile { display: none !important; }
         }
+        .leaflet-top, .leaflet-bottom, .leaflet-control-container { z-index: 1 !important; }
       `}</style>
 
       {/* Tooltip hover */}
@@ -2199,7 +2201,24 @@ export default function Dashboard() {
                       Como chegar
                     </a>
                   )}
-                  <MapaLocal local={localSelecionado} />
+                  <button
+                    onClick={async () => {
+                      if (!navigator.geolocation) return alert('Seu navegador não suporta geolocalização.')
+                      if (navigator.permissions) {
+                        const perm = await navigator.permissions.query({ name: 'geolocation' })
+                        if (perm.state === 'denied') {
+                          alert('Localização bloqueada. Acesse as configurações do navegador → Permissões do site → Localização e permita este site.')
+                          return
+                        }
+                      }
+                      mapaLocalRef.current?.ativarLocalizacao()
+                    }}
+                    style={{ ...s.editBtn, position: 'absolute', bottom: '12px', left: '12px', zIndex: 1000, fontSize: '13px', background: '#fff', color: '#374151', border: '1.5px solid #e5e7eb', display: 'flex', alignItems: 'center' }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="8" height="12" viewBox="0 0 25 41" style={{ marginRight: '6px', flexShrink: 0 }}><path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 9.4 12.5 28.5 12.5 28.5S25 21.9 25 12.5C25 5.6 19.4 0 12.5 0z" fill="#f97316" stroke="#fff" strokeWidth="1.5"/><circle cx="12.5" cy="12.5" r="5" fill="#fff" opacity="0.8"/></svg>
+                    Ativar localização
+                  </button>
+                  <MapaLocal ref={mapaLocalRef} local={localSelecionado} />
                 </div>
               ) : (
                 <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.08)' }}>
@@ -3000,11 +3019,12 @@ export default function Dashboard() {
                   placeholder="Buscar por nome..."
                   value={filtroUsuarioNome}
                   onChange={e => setFiltroUsuarioNome(e.target.value)}
-                  style={{ flex: '1 1 180px', padding: '9px 14px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '14px', fontFamily: 'inherit', outline: 'none' }}
+                  style={{ width: '100%', padding: '7px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
                 />
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <select value={filtroUsuarioPerfil} onChange={e => setFiltroUsuarioPerfil(e.target.value)} style={{ flex: 1, padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
-                    <option value="">Perfil</option>
+                    <option value="" disabled hidden>Perfil</option>
+                    <option value="">Todos</option>
                     <option value="admin">Admin</option>
                     <option value="lider">Líder</option>
                     <option value="voluntario">Voluntário</option>
@@ -3012,11 +3032,13 @@ export default function Dashboard() {
                     <option value="prefeitura">Prefeitura</option>
                   </select>
                   <select value={filtroUsuarioEquipe} onChange={e => setFiltroUsuarioEquipe(e.target.value)} style={{ flex: 1, padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
-                    <option value="">Equipe</option>
+                    <option value="" disabled hidden>Equipe</option>
+                    <option value="">Todos</option>
                     {equipes.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
                   </select>
                   <select value={filtroUsuarioGrupo} onChange={e => setFiltroUsuarioGrupo(e.target.value)} style={{ flex: 1, padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
-                    <option value="">Grupo</option>
+                    <option value="" disabled hidden>Grupo</option>
+                    <option value="">Todos</option>
                     {grupos.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
                   </select>
                 </div>
