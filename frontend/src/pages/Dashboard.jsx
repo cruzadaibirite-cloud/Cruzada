@@ -818,7 +818,8 @@ export default function Dashboard() {
           .dash-kpi-grid { grid-template-columns: 1fr 1fr !important; }
           .dash-mid-grid { grid-template-columns: 1fr !important; }
           .dash-bot-grid { grid-template-columns: 1fr !important; }
-          .dash-check-grid { grid-template-columns: 1fr !important; }
+          .dash-check-grid { grid-template-columns: 1fr !important; width: 100% !important; align-items: flex-start !important; }
+          .dash-check-grid label { justify-content: flex-start !important; white-space: nowrap !important; text-align: left !important; margin-left: 0 !important; margin-right: auto !important; }
           .dash-form-grid { grid-template-columns: 1fr !important; }
           .dash-faixa-etaria { margin-bottom: 24px !important; }
           .pessoa-detalhe { padding: 20px 16px 90px !important; }
@@ -3747,8 +3748,9 @@ const s = {
     gap: '16px',
   },
   checkGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     gap: '12px',
   },
   checkLabel: {
