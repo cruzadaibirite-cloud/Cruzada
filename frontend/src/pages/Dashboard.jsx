@@ -3098,6 +3098,7 @@ export default function Dashboard() {
             {[
               { key: 'agenda', path: '/sistema/agenda', label: 'Agenda' },
               { key: 'evangelismo', path: '/sistema/evangelismo', label: 'Evangelismo' },
+              { key: 'pessoas', path: '/sistema/pessoas', label: 'Pessoas' },
               { key: 'mapa', path: '/sistema/mapa', label: 'Mapa' },
               { key: 'dashboard', path: '/sistema/dashboard', label: 'Dashboard' },
             ].map(item => (
