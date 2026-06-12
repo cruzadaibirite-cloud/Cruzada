@@ -233,6 +233,13 @@ export default function Dashboard() {
     if (menu === 'mapa') carregarAbordagensComTotal()
   }, [menu])
 
+  useEffect(() => {
+    if (modalPessoa) {
+      const t = setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, 80)
+      return () => clearTimeout(t)
+    }
+  }, [modalPessoa?.observacao_2])
+
   async function carregarEventos() {
     const { data } = await supabase.from('eventos').select('*, locais(nome), equipes(nome)').order('data').order('hora_inicio')
     if (data) {
@@ -2230,7 +2237,7 @@ export default function Dashboard() {
 
                   {/* Status + Telefone */}
                   {(() => {
-                    const col = KANBAN_COLUNAS.find(c => c.key === (modalPessoa.status_contato || 'pendente'))
+                    const col = KANBAN_COLUNAS.find(c => c.key === (modalPessoa.status_contato || 'pendente')) || KANBAN_COLUNAS[0]
                     return (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                         <div style={{ position: 'relative' }}>
@@ -2293,7 +2300,6 @@ export default function Dashboard() {
                   {(() => {
                     let anotacoes = []
                     try { anotacoes = modalPessoa.observacao_2 ? JSON.parse(modalPessoa.observacao_2) : [] } catch { anotacoes = [] }
-                    setTimeout(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, 50)
                     return (
                       <div style={{ flex: '1 1 0', minHeight: 0, background: '#f9fafb', borderRadius: '12px', padding: '12px 14px', marginBottom: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                         {anotacoes.length === 0 && (
