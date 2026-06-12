@@ -72,6 +72,7 @@ export default function Dashboard() {
   const [filtroUsuarioPerfil, setFiltroUsuarioPerfil] = useState('')
   const [filtroUsuarioEquipe, setFiltroUsuarioEquipe] = useState('')
   const [filtroUsuarioGrupo, setFiltroUsuarioGrupo] = useState('')
+  const [filtrosExpandidos, setFiltrosExpandidos] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [perfilUsuario, setPerfilUsuario] = useState('')
@@ -3015,34 +3016,41 @@ export default function Dashboard() {
 
               {/* Busca e filtros */}
               <div className="usuarios-filtros" style={{ display: 'none', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
-                <input
-                  type="text"
-                  placeholder="Buscar por nome..."
-                  value={filtroUsuarioNome}
-                  onChange={e => setFiltroUsuarioNome(e.target.value)}
-                  style={{ width: '100%', padding: '7px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
-                />
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <select value={filtroUsuarioPerfil} onChange={e => setFiltroUsuarioPerfil(e.target.value)} style={{ flex: 1, padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
-                    <option value="" disabled hidden>Perfil</option>
-                    <option value="">Todos</option>
-                    <option value="admin">Admin</option>
-                    <option value="lider">Líder</option>
-                    <option value="voluntario">Voluntário</option>
-                    <option value="igreja">Igreja</option>
-                    <option value="prefeitura">Prefeitura</option>
-                  </select>
-                  <select value={filtroUsuarioEquipe} onChange={e => setFiltroUsuarioEquipe(e.target.value)} style={{ flex: 1, padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
-                    <option value="" disabled hidden>Equipe</option>
-                    <option value="">Todos</option>
-                    {equipes.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-                  </select>
-                  <select value={filtroUsuarioGrupo} onChange={e => setFiltroUsuarioGrupo(e.target.value)} style={{ flex: 1, padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
-                    <option value="" disabled hidden>Grupo</option>
-                    <option value="">Todos</option>
-                    {grupos.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
-                  </select>
+                  <input
+                    type="text"
+                    placeholder="Buscar por nome..."
+                    value={filtroUsuarioNome}
+                    onChange={e => setFiltroUsuarioNome(e.target.value)}
+                    style={{ flex: 1, padding: '7px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                  <button onClick={() => setFiltrosExpandidos(v => !v)} style={{ padding: '7px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: filtrosExpandidos ? '#F97310' : '#fff', color: filtrosExpandidos ? '#fff' : '#374151', fontSize: '14px', cursor: 'pointer', flexShrink: 0 }}>
+                    {filtrosExpandidos ? '▲' : '▼'}
+                  </button>
                 </div>
+                {filtrosExpandidos && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <select value={filtroUsuarioPerfil} onChange={e => setFiltroUsuarioPerfil(e.target.value)} style={{ width: '100%', padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
+                      <option value="" disabled hidden>Perfil</option>
+                      <option value="">Todos</option>
+                      <option value="admin">Admin</option>
+                      <option value="lider">Líder</option>
+                      <option value="voluntario">Voluntário</option>
+                      <option value="igreja">Igreja</option>
+                      <option value="prefeitura">Prefeitura</option>
+                    </select>
+                    <select value={filtroUsuarioEquipe} onChange={e => setFiltroUsuarioEquipe(e.target.value)} style={{ width: '100%', padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
+                      <option value="" disabled hidden>Equipe</option>
+                      <option value="">Todos</option>
+                      {equipes.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
+                    </select>
+                    <select value={filtroUsuarioGrupo} onChange={e => setFiltroUsuarioGrupo(e.target.value)} style={{ width: '100%', padding: '9px 10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontFamily: 'inherit', background: '#fff' }}>
+                      <option value="" disabled hidden>Grupo</option>
+                      <option value="">Todos</option>
+                      {grupos.map(g => <option key={g.id} value={g.id}>{g.nome}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
 
               {loadingUsers && <p style={s.info}>Carregando...</p>}
@@ -3169,7 +3177,7 @@ export default function Dashboard() {
                   <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={async () => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); setErroEquipeObrigatoria(false); const orgs = await carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos() }}>
                     <div style={s.cardAvatar}>{u.nome?.[0]?.toUpperCase()}</div>
                     <div style={s.cardInfo}>
-                      <div style={s.cardNome}>{u.nome}</div>
+                      <div style={s.cardNome}>{(() => { const p = (u.nome || '').trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0] })()}</div>
                       <div style={s.cardSub}>{u.email}</div>
                       {u.telefone && <div style={s.cardSub}>{u.telefone}</div>}
                     </div>
@@ -3336,7 +3344,7 @@ function VoluntarioCard({ v, onClick }) {
       <div style={s.cardAvatar}>{v.nome_completo?.[0]?.toUpperCase()}</div>
       <div style={s.cardInfo}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={s.cardNome}>{v.nome_completo}</span>
+          <span style={s.cardNome}>{(() => { const p = (v.nome_completo || '').trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0] })()}</span>
           {pendente && <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f1117', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '4px', padding: '1px 6px' }}>incompleto</span>}
         </div>
         <div style={s.cardSub}>{v.cidade_estado_pais}</div>
