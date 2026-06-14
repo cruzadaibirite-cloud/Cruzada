@@ -3179,7 +3179,6 @@ export default function Dashboard() {
                     <div style={s.cardAvatar}>{u.nome?.[0]?.toUpperCase()}</div>
                     <div style={s.cardInfo}>
                       <div style={s.cardNome}>{(() => { const p = (u.nome || '').trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0] })()}</div>
-                      <div style={s.cardSub}>{u.email}</div>
                       {u.telefone && <div style={s.cardSub}>{u.telefone}</div>}
                     </div>
                     <div style={s.cardStatus}>{u.perfil}</div>
