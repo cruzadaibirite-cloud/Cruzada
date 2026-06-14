@@ -62,7 +62,10 @@ export default function Dashboard() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : location.pathname === '/sistema/evangelismo' ? 'evangelismo' : location.pathname === '/sistema/pessoas' ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
+  const isMobile = () => window.innerWidth < 768
+  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
+  const isNovaAbordagemPage = location.pathname === '/sistema/evangelismo/nova-abordagem'
+  const pessoaIdPage = location.pathname.startsWith('/sistema/pessoas/') ? location.pathname.split('/sistema/pessoas/')[1] : null
   const [voluntarios, setVoluntarios] = useState([])
   const [loadingVol, setLoadingVol] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -234,10 +237,29 @@ export default function Dashboard() {
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'locais' || menu === 'agenda') carregarLocais()
     if (menu === 'agenda') { carregarEventos(); carregarEquipes() }
-    if (menu === 'evangelismo') { carregarAbordagens(); carregarEquipes(); if (user?.id) carregarOrgsUsuario(user.id) }
-    if (menu === 'pessoas') carregarPessoasKanban()
+    if (menu === 'evangelismo') {
+      carregarAbordagens(); carregarEquipes(); if (user?.id) carregarOrgsUsuario(user.id)
+      if (isNovaAbordagemPage) {
+        const agora = new Date()
+        const dataHoraLocal = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}-${String(agora.getDate()).padStart(2,'0')}T${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+        setFormAbordagem(f => ({ ...f, data_hora: dataHoraLocal }))
+        setModalAbordagem(true)
+      }
+    }
+    if (menu === 'pessoas') { carregarPessoasKanban() }
     if (menu === 'mapa') carregarAbordagensComTotal()
   }, [menu])
+
+  useEffect(() => {
+    if (pessoaIdPage && pessoasKanban.length > 0) {
+      const p = pessoasKanban.find(x => x.id === pessoaIdPage)
+      if (p) {
+        setModalPessoa(p); setObs2Value(''); setShowObs(false)
+        supabase.from('evangelizados').select('id, nome').eq('responsavel_id', p.id).eq('dependente', true).then(({ data }) => setDependentesDaPessoa(data || []))
+      }
+    }
+    if (!pessoaIdPage) setModalPessoa(null)
+  }, [pessoaIdPage, pessoasKanban])
 
   useEffect(() => {
     if (modalPessoa) {
@@ -2263,7 +2285,7 @@ export default function Dashboard() {
                 <div className="pessoa-detalhe" style={{ display: 'flex', flexDirection: 'column', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: '32px 32px 24px' }}>
                   {/* Cabeçalho */}
                   <div style={{ marginBottom: '16px' }}>
-                    <button onClick={() => setModalPessoa(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit', marginBottom: '8px' }}>
+                    <button onClick={() => { setModalPessoa(null); if (pessoaIdPage) navigate('/sistema/pessoas') }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit', marginBottom: '8px' }}>
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                       Voltar
                     </button>
@@ -2457,7 +2479,7 @@ export default function Dashboard() {
                                 draggable
                                 onDragStart={() => setDragPessoa({ id: p.id, status: p.status_contato || 'pendente' })}
                                 onDragEnd={() => { setDragPessoa(null); setDragOver(null) }}
-                                onClick={async () => { setModalPessoa(p); setObs2Value(''); setShowObs(false); const { data: deps } = await supabase.from('evangelizados').select('id, nome').eq('responsavel_id', p.id).eq('dependente', true); setDependentesDaPessoa(deps || []) }}
+                                onClick={async () => { if (isMobile()) { navigate(`/sistema/pessoas/${p.id}`) } else { setModalPessoa(p); setObs2Value(''); setShowObs(false); const { data: deps } = await supabase.from('evangelizados').select('id, nome').eq('responsavel_id', p.id).eq('dependente', true); setDependentesDaPessoa(deps || []) } }}
                                 style={{ background: '#fff', borderRadius: '10px', padding: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', cursor: 'grab', borderLeft: `3px solid ${col.cor}` }}>
                                 <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117', marginBottom: '4px' }}>{p.nome}</div>
                                 {p.telefone && <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>{p.telefone}</div>}
@@ -2495,7 +2517,7 @@ export default function Dashboard() {
                               )}
                               {cartoes.map(p => (
                                 <div key={p.id}
-                                  onClick={async () => { setModalPessoa(p); setObs2Value(''); setShowObs(false); const { data: deps } = await supabase.from('evangelizados').select('id, nome').eq('responsavel_id', p.id).eq('dependente', true); setDependentesDaPessoa(deps || []) }}
+                                  onClick={async () => { if (isMobile()) { navigate(`/sistema/pessoas/${p.id}`) } else { setModalPessoa(p); setObs2Value(''); setShowObs(false); const { data: deps } = await supabase.from('evangelizados').select('id, nome').eq('responsavel_id', p.id).eq('dependente', true); setDependentesDaPessoa(deps || []) } }}
                                   style={{ background: '#f9fafb', borderRadius: '10px', padding: '12px 14px', cursor: 'pointer', borderLeft: `3px solid ${col.cor}` }}>
                                   <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117', marginBottom: '2px' }}>{p.nome}</div>
                                   {p.telefone && <div style={{ fontSize: '12px', color: '#6b7280' }}>{p.telefone}</div>}
@@ -2626,8 +2648,14 @@ export default function Dashboard() {
               )}
 
               {modalAbordagem && (
-                <div style={s.modalOverlay} onClick={() => { setModalAbordagem(false); setSugestoesEndereco([]); setEnderecoConfirmado(false); setErroAbordagem('') }}>
-                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '960px', padding: '24px 32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', maxHeight: '70vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div className="nova-abordagem-overlay" style={s.modalOverlay} onClick={() => { setModalAbordagem(false); setSugestoesEndereco([]); setEnderecoConfirmado(false); setErroAbordagem('') }}>
+                  <div className="nova-abordagem-inner" style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '960px', padding: '24px 32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', maxHeight: '70vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                    <div className="nova-abordagem-voltar" style={{ display: 'none', marginBottom: '16px' }}>
+                      <button onClick={() => { setModalAbordagem(false); setSugestoesEndereco([]); setEnderecoConfirmado(false); setErroAbordagem(''); navigate('/sistema/evangelismo') }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        Voltar
+                      </button>
+                    </div>
                     <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Nova Abordagem</h3>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -2948,7 +2976,7 @@ export default function Dashboard() {
                       const agora = new Date()
                       const dataHoraLocal = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}-${String(agora.getDate()).padStart(2,'0')}T${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
                       setFormAbordagem(f => ({ ...f, data_hora: dataHoraLocal }))
-                      setModalAbordagem(true)
+                      if (isMobile()) { navigate('/sistema/evangelismo/nova-abordagem') } else { setModalAbordagem(true) }
                     }}>+ Nova abordagem</button>
                   </div>
                   {loadingEvang && <p style={s.info}>Carregando...</p>}
