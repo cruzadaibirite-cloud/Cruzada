@@ -2997,11 +2997,11 @@ export default function Dashboard() {
                       >
                         <div>
                           <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f1117' }}>{ab.local}</div>
-                          {ab.endereco && <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>{ab.endereco}</div>}
-                          <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '4px' }}>
+                          <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
                             {ab.data_hora ? new Date(ab.data_hora).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
-                            {ab.usuarios?.nome ? ` · por ${ab.usuarios.nome}` : ''}
-                            {ab.equipes?.nome ? ` · ${ab.equipes.nome}` : ''}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>
+                            {[ab.usuarios?.nome, ab.equipes?.nome].filter(Boolean).join(' · ')}
                           </div>
                         </div>
                         <span style={{ fontSize: '12px', fontWeight: 700, color: '#F97310' }}>Ver →</span>
