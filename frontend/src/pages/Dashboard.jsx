@@ -2177,7 +2177,7 @@ export default function Dashboard() {
 
               {buscaLocal.length > 0 && buscaLocal !== localSelecionado?.nome && (
                 <div style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', marginBottom: '16px', overflow: 'hidden' }}>
-                  {locais.filter(l => l.nome.toLowerCase().includes(buscaLocal.toLowerCase()) || l.bairro?.toLowerCase().includes(buscaLocal.toLowerCase())).slice(0, 8).map(l => (
+                  {locais.filter(l => { const termo = buscaLocal.toLowerCase().replace(/\brua\b/g, 'r.').replace(/\bavenida\b/g, 'av.').replace(/\bpraça\b/g, 'pç.'); return l.nome.toLowerCase().includes(termo) || l.bairro?.toLowerCase().includes(termo) || l.endereco?.toLowerCase().includes(termo) }).slice(0, 8).map(l => (
                     <div key={l.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
                       onMouseLeave={e => e.currentTarget.style.background = '#fff'}
