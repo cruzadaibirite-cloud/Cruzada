@@ -3584,16 +3584,23 @@ const s = {
   },
   cardInfo: {
     flex: 1,
+    minWidth: 0,
   },
   cardNome: {
     fontSize: '15px',
     fontWeight: 800,
     color: '#0f1117',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   cardSub: {
     fontSize: '13px',
     color: '#9ca3af',
     marginTop: '2px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   cardStatus: {
     fontSize: '12px',
