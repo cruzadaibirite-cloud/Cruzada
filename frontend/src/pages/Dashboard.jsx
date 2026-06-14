@@ -828,6 +828,7 @@ export default function Dashboard() {
           .kanban-desktop { display: none !important; }
           .kanban-mobile { display: flex !important; }
           .abordagem-pessoa-grid { grid-template-columns: 1fr !important; }
+          .abordagem-pessoa-card { background: transparent !important; border: none !important; padding: 0 !important; }
           .dash-form-section { padding: 16px 14px !important; overflow: hidden; max-width: 100%; }
           .dash-form-section input, .dash-form-section textarea { max-width: 100% !important; box-sizing: border-box !important; width: 100% !important; }
           .usuarios-filtros { display: flex !important; }
@@ -2631,7 +2632,7 @@ export default function Dashboard() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                       {pessoas.map((pessoa, idx) => (
-                        <div key={idx} style={{ background: '#f9fafb', borderRadius: '12px', padding: '14px', border: '1px solid #e5e7eb' }}>
+                        <div key={idx} className="abordagem-pessoa-card" style={{ background: '#f9fafb', borderRadius: '12px', padding: '14px', border: '1px solid #e5e7eb' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 700, color: '#6b7280' }}>Pessoa {idx + 1}</span>
                             {pessoas.length > 1 && (
@@ -2695,6 +2696,8 @@ export default function Dashboard() {
                       ))}
 
                       <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontSize: '13px', fontWeight: 700, textAlign: 'center', padding: '4px 0', fontFamily: 'inherit' }} onClick={() => setPessoas(p => [...p, { nome: '', telefone: '', endereco_pessoa: '', observacao: '' }])}>+ Adicionar pessoa</button>
+
+                      <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '20px', marginTop: '8px' }}>Local do Evangelismo</h3>
 
                       <div style={{ position: 'relative' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
