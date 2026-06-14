@@ -820,7 +820,8 @@ export default function Dashboard() {
           .dash-mid-grid { grid-template-columns: 1fr !important; }
           .dash-bot-grid { grid-template-columns: 1fr !important; }
           .dash-check-grid { grid-template-columns: 1fr !important; width: 100% !important; align-items: flex-start !important; }
-          .dash-check-grid label { justify-content: flex-start !important; white-space: nowrap !important; text-align: left !important; margin-left: 0 !important; margin-right: auto !important; }
+          .dash-check-grid label { justify-content: flex-start !important; white-space: nowrap !important; text-align: left !important; margin-left: 0 !important; margin-right: auto !important; display: flex !important; align-items: center !important; }
+          .dash-check-grid input[type="checkbox"] { width: 16px !important; height: 16px !important; min-width: 16px !important; min-height: 16px !important; margin: 0 !important; flex-shrink: 0 !important; }
           .dash-form-grid { grid-template-columns: 1fr !important; }
           .dash-faixa-etaria { margin-bottom: 24px !important; }
           .pessoa-detalhe { padding: 20px 16px 90px !important; }
@@ -3769,11 +3770,16 @@ const s = {
     fontWeight: 600,
     color: '#0f1117',
     cursor: 'default',
+    WebkitAlignItems: 'center',
   },
   checkbox: {
     width: '16px',
     height: '16px',
+    minWidth: '16px',
+    minHeight: '16px',
     accentColor: '#F97310',
+    flexShrink: 0,
+    margin: 0,
   },
   detalheGrid: {
     display: 'grid',
