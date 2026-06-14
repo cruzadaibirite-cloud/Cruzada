@@ -854,8 +854,8 @@ export default function Dashboard() {
           .kanban-mobile { display: flex !important; }
           .abordagem-pessoa-grid { grid-template-columns: 1fr !important; }
           .abordagem-pessoa-card { background: transparent !important; border: none !important; padding: 0 !important; }
-          .nova-abordagem-overlay { background: rgba(0,0,0,0) !important; align-items: flex-start !important; padding: 0 !important; pointer-events: none !important; }
-          .nova-abordagem-inner { border-radius: 0 !important; max-width: 100% !important; max-height: 100vh !important; min-height: 100vh !important; box-shadow: none !important; padding: 24px 20px 80px !important; pointer-events: all !important; overflow-y: auto !important; }
+          .nova-abordagem-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; }
+          .nova-abordagem-inner { border-radius: 0 !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; padding: 24px 20px 100px !important; overflow-y: visible !important; }
           .nova-abordagem-voltar { display: flex !important; }
           .dash-form-section { padding: 16px 14px !important; overflow: hidden; max-width: 100%; }
           .dash-form-section input, .dash-form-section textarea { max-width: 100% !important; box-sizing: border-box !important; width: 100% !important; }
