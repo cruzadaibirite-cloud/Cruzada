@@ -237,18 +237,21 @@ export default function Dashboard() {
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'locais' || menu === 'agenda') carregarLocais()
     if (menu === 'agenda') { carregarEventos(); carregarEquipes() }
-    if (menu === 'evangelismo') {
-      carregarAbordagens(); carregarEquipes(); if (user?.id) carregarOrgsUsuario(user.id)
-      if (isNovaAbordagemPage) {
-        const agora = new Date()
-        const dataHoraLocal = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}-${String(agora.getDate()).padStart(2,'0')}T${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
-        setFormAbordagem(f => ({ ...f, data_hora: dataHoraLocal }))
-        setModalAbordagem(true)
-      }
-    }
+    if (menu === 'evangelismo') { carregarAbordagens(); carregarEquipes(); if (user?.id) carregarOrgsUsuario(user.id) }
     if (menu === 'pessoas') { carregarPessoasKanban() }
     if (menu === 'mapa') carregarAbordagensComTotal()
   }, [menu])
+
+  useEffect(() => {
+    if (isNovaAbordagemPage) {
+      const agora = new Date()
+      const dataHoraLocal = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}-${String(agora.getDate()).padStart(2,'0')}T${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
+      setFormAbordagem(f => ({ ...f, data_hora: dataHoraLocal }))
+      setModalAbordagem(true)
+    } else {
+      setModalAbordagem(false)
+    }
+  }, [isNovaAbordagemPage])
 
   useEffect(() => {
     if (pessoaIdPage && pessoasKanban.length > 0) {
@@ -851,6 +854,9 @@ export default function Dashboard() {
           .kanban-mobile { display: flex !important; }
           .abordagem-pessoa-grid { grid-template-columns: 1fr !important; }
           .abordagem-pessoa-card { background: transparent !important; border: none !important; padding: 0 !important; }
+          .nova-abordagem-overlay { background: rgba(0,0,0,0) !important; align-items: flex-start !important; padding: 0 !important; pointer-events: none !important; }
+          .nova-abordagem-inner { border-radius: 0 !important; max-width: 100% !important; max-height: 100vh !important; min-height: 100vh !important; box-shadow: none !important; padding: 24px 20px 80px !important; pointer-events: all !important; overflow-y: auto !important; }
+          .nova-abordagem-voltar { display: flex !important; }
           .dash-form-section { padding: 16px 14px !important; overflow: hidden; max-width: 100%; }
           .dash-form-section input, .dash-form-section textarea { max-width: 100% !important; box-sizing: border-box !important; width: 100% !important; }
           .usuarios-filtros { display: flex !important; }
@@ -2479,7 +2485,7 @@ export default function Dashboard() {
                                 draggable
                                 onDragStart={() => setDragPessoa({ id: p.id, status: p.status_contato || 'pendente' })}
                                 onDragEnd={() => { setDragPessoa(null); setDragOver(null) }}
-                                onClick={async () => { if (isMobile()) { navigate(`/sistema/pessoas/${p.id}`) } else { setModalPessoa(p); setObs2Value(''); setShowObs(false); const { data: deps } = await supabase.from('evangelizados').select('id, nome').eq('responsavel_id', p.id).eq('dependente', true); setDependentesDaPessoa(deps || []) } }}
+                                onClick={() => navigate(`/sistema/pessoas/${p.id}`)}
                                 style={{ background: '#fff', borderRadius: '10px', padding: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', cursor: 'grab', borderLeft: `3px solid ${col.cor}` }}>
                                 <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117', marginBottom: '4px' }}>{p.nome}</div>
                                 {p.telefone && <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '2px' }}>{p.telefone}</div>}
@@ -2517,7 +2523,7 @@ export default function Dashboard() {
                               )}
                               {cartoes.map(p => (
                                 <div key={p.id}
-                                  onClick={async () => { if (isMobile()) { navigate(`/sistema/pessoas/${p.id}`) } else { setModalPessoa(p); setObs2Value(''); setShowObs(false); const { data: deps } = await supabase.from('evangelizados').select('id, nome').eq('responsavel_id', p.id).eq('dependente', true); setDependentesDaPessoa(deps || []) } }}
+                                  onClick={() => navigate(`/sistema/pessoas/${p.id}`)}
                                   style={{ background: '#f9fafb', borderRadius: '10px', padding: '12px 14px', cursor: 'pointer', borderLeft: `3px solid ${col.cor}` }}>
                                   <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117', marginBottom: '2px' }}>{p.nome}</div>
                                   {p.telefone && <div style={{ fontSize: '12px', color: '#6b7280' }}>{p.telefone}</div>}
@@ -2976,7 +2982,7 @@ export default function Dashboard() {
                       const agora = new Date()
                       const dataHoraLocal = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}-${String(agora.getDate()).padStart(2,'0')}T${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
                       setFormAbordagem(f => ({ ...f, data_hora: dataHoraLocal }))
-                      if (isMobile()) { navigate('/sistema/evangelismo/nova-abordagem') } else { setModalAbordagem(true) }
+                      navigate('/sistema/evangelismo/nova-abordagem')
                     }}>+ Nova abordagem</button>
                   </div>
                   {loadingEvang && <p style={s.info}>Carregando...</p>}
