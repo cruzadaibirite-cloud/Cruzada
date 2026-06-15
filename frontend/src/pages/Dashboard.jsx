@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import MapaLocal from '../components/MapaLocal'
 import MapaEvangelismo from '../components/MapaEvangelismo'
 import { useAuth } from '../contexts/AuthContext'
@@ -13,6 +13,7 @@ const MENU = [
   { key: 'evangelismo', label: 'Evangelismo', path: '/sistema/evangelismo' },
   { key: 'pessoas', label: 'Pessoas', path: '/sistema/pessoas' },
   { key: 'mapa', label: 'Mapa', path: '/sistema/mapa' },
+  { key: 'treinamento', label: 'Treinamento', path: '/sistema/treinamento' },
   { key: 'dashboard', label: 'Dashboard', path: '/sistema/dashboard' },
 ]
 
@@ -63,7 +64,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = () => window.innerWidth < 768
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
+  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
   const isNovaAbordagemPage = location.pathname === '/sistema/evangelismo/nova-abordagem'
   const pessoaIdPage = location.pathname.startsWith('/sistema/pessoas/') ? location.pathname.split('/sistema/pessoas/')[1] : null
   const [voluntarios, setVoluntarios] = useState([])
@@ -189,6 +190,7 @@ export default function Dashboard() {
   const [pessoasKanban, setPessoasKanban] = useState([])
   const [loadingPessoas, setLoadingPessoas] = useState(false)
   const [dragPessoa, setDragPessoa] = useState(null)
+  const [videoAtivo, setVideoAtivo] = useState(null)
   const [dragOver, setDragOver] = useState(null)
   const [acordeaoAberto, setAcordeaoAberto] = useState({})
   const [modalPessoa, setModalPessoa] = useState(null)
@@ -857,6 +859,7 @@ export default function Dashboard() {
           .nova-abordagem-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; }
           .nova-abordagem-inner { border-radius: 0 !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; padding: 24px 20px 100px !important; overflow-y: visible !important; }
           .nova-abordagem-voltar { display: flex !important; }
+          .treinamento-layout { grid-template-columns: 1fr !important; }
           .edit-abordagem-btns { justify-content: space-between !important; }
           .edit-abordagem-btns button { flex: 1 !important; text-align: center !important; }
           .dash-form-section { padding: 16px 14px !important; overflow: hidden; max-width: 100%; }
@@ -944,6 +947,62 @@ export default function Dashboard() {
 
         {/* Conteúdo */}
         <div style={s.main} className="dash-main">
+
+          {menu === 'treinamento' && (() => {
+            const VIDEOS = [
+              { id: 'KbSOebKfEBk', titulo: 'EU SOU MAIOR INIMIGO DO TERMO NEOPENTECOSTAL \'DECRETE\'', categoria: 'Evangelismo' },
+              { id: 'kQy3en6AkEY', titulo: 'Opiniões sobre o meio gospel que são boas, mas...', categoria: 'Evangelismo' },
+              { id: 'YLS8rAWwmvk', titulo: 'Frases gospel que parecem espirituais, mas são perigosas', categoria: 'Oração' },
+              { id: 'e0jTC8iaHvs', titulo: '#43 - Jesus é o centro da história - Zé Bruno - Quem é Jesus?', categoria: 'Louvor' },
+            ]
+            const ativo = videoAtivo || VIDEOS[0]
+            return (
+              <div>
+                <h2 style={s.pageTitle}>Treinamento</h2>
+                <div className="treinamento-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 780px) 1fr', gap: '20px', alignItems: 'start' }}>
+                  {/* Player */}
+                  <div style={{ background: '#000', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+                      <iframe
+                        key={ativo.id}
+                        src={`https://www.youtube.com/embed/${ativo.id}`}
+                        title={ativo.titulo}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                      />
+                    </div>
+                    <div style={{ padding: '14px 16px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '4px' }}>{ativo.categoria}</div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff' }}>{ativo.titulo}</div>
+                    </div>
+                  </div>
+
+                  {/* Lista */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '70vh', overflowY: 'auto' }}>
+                    {VIDEOS.map((v, i) => (
+                      <div key={i} onClick={() => setVideoAtivo(v)}
+                        style={{ display: 'flex', gap: '10px', alignItems: 'center', background: ativo.id === v.id ? '#fff4ec' : '#fff', borderRadius: '10px', padding: '10px', cursor: 'pointer', border: ativo.id === v.id ? '1.5px solid #F97310' : '1.5px solid transparent', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                        <div style={{ position: 'relative', flexShrink: 0, width: '120px' }}>
+                          <img src={`https://img.youtube.com/vi/${v.id}/mqdefault.jpg`} alt={v.titulo} style={{ width: '120px', aspectRatio: '16/9', objectFit: 'cover', borderRadius: '6px', display: 'block' }} />
+                          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ width: '24px', height: '24px', background: 'rgba(249,115,16,0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="#fff"><polygon points="5,3 19,12 5,21"/></svg>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: '#F97310', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{v.categoria}</div>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f1117', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.titulo}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {menu === 'dashboard' && (() => {
             const base = filtro ? filtro.lista : voluntarios
@@ -3241,6 +3300,7 @@ export default function Dashboard() {
               { key: 'evangelismo', path: '/sistema/evangelismo', label: 'Evangelismo' },
               { key: 'pessoas', path: '/sistema/pessoas', label: 'Pessoas' },
               { key: 'mapa', path: '/sistema/mapa', label: 'Mapa' },
+              { key: 'treinamento', path: '/sistema/treinamento', label: 'Treinamento' },
               { key: 'dashboard', path: '/sistema/dashboard', label: 'Dashboard' },
             ].map(item => (
               <button key={item.key} onClick={() => { navigate(item.path); setMenuMobileAberto(false) }}

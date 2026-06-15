@@ -23,6 +23,7 @@ export default function App() {
         <Route path="/sistema/pessoas" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/pessoas/:pessoaId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/mapa" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/sistema/treinamento" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
