@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export default function MapaEvangelismo({ abordagens }) {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const marcadoresRef = useRef([])
+  const [telaCheia, setTelaCheia] = useState(false)
 
   useEffect(() => {
     const L = window.L
@@ -53,13 +54,15 @@ export default function MapaEvangelismo({ abordagens }) {
 
         const icone = L.divIcon({
           className: '',
-          html: `<svg width="24" height="36" viewBox="0 0 24 36" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 0C5.373 0 0 5.373 0 12c0 8 12 24 12 24S24 20 24 12C24 5.373 18.627 0 12 0z" fill="#F97310"/>
-            <circle cx="12" cy="12" r="5" fill="#fff"/>
-          </svg>`,
-          iconSize: [24, 36],
-          iconAnchor: [12, 36],
-          popupAnchor: [0, -36],
+          html: `
+            <div style="position:relative;width:20px;height:20px;display:flex;align-items:center;justify-content:center;">
+              <div style="position:absolute;width:20px;height:20px;background:rgba(249,115,16,0.4);border-radius:50%;animation:ping 1.5s ease-in-out infinite;"></div>
+              <div style="width:10px;height:10px;background:#F97310;border-radius:50%;border:0.5px solid #fff;position:relative;z-index:1;"></div>
+            </div>
+          `,
+          iconSize: [20, 20],
+          iconAnchor: [10, 10],
+          popupAnchor: [0, -12],
         })
 
         const data_hora = ab.data_hora
@@ -95,8 +98,28 @@ export default function MapaEvangelismo({ abordagens }) {
       <style>{`
         .mapa-evangelismo { height: calc(100vh - 200px); }
         @media (max-width: 768px) { .mapa-evangelismo { height: calc(100vh - 280px); } }
+        .mapa-evangelismo-tela-cheia { height: 100vh !important; border-radius: 0 !important; }
+        .mapa-evangelismo .leaflet-tile { outline: 1px solid transparent; }
+        .mapa-evangelismo img.leaflet-tile { margin: 0; padding: 0; }
+        @keyframes ping {
+          0% { transform: scale(1); opacity: 0.8; }
+          70% { transform: scale(2.2); opacity: 0; }
+          100% { transform: scale(1); opacity: 0; }
+        }
       `}</style>
-      <div ref={mapRef} className="mapa-evangelismo" style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.3)' }} />
+      <div style={{ position: 'relative', ...(telaCheia ? { position: 'fixed', inset: 0, zIndex: 9999 } : {}) }}>
+        <button
+          onClick={() => { setTelaCheia(v => !v); setTimeout(() => mapInstanceRef.current?.invalidateSize(), 100) }}
+          style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 1000, background: '#fff', border: 'none', borderRadius: '8px', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+          title={telaCheia ? 'Sair da tela cheia' : 'Tela cheia'}
+        >
+          {telaCheia
+            ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>
+            : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          }
+        </button>
+        <div ref={mapRef} className={`mapa-evangelismo${telaCheia ? ' mapa-evangelismo-tela-cheia' : ''}`} style={{ borderRadius: telaCheia ? '0' : '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.3)' }} />
+      </div>
     </>
   )
 }

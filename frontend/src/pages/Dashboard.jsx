@@ -857,6 +857,8 @@ export default function Dashboard() {
           .nova-abordagem-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; }
           .nova-abordagem-inner { border-radius: 0 !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; padding: 24px 20px 100px !important; overflow-y: visible !important; }
           .nova-abordagem-voltar { display: flex !important; }
+          .edit-abordagem-btns { justify-content: space-between !important; }
+          .edit-abordagem-btns button { flex: 1 !important; text-align: center !important; }
           .dash-form-section { padding: 16px 14px !important; overflow: hidden; max-width: 100%; }
           .dash-form-section input, .dash-form-section textarea { max-width: 100% !important; box-sizing: border-box !important; width: 100% !important; }
           .usuarios-filtros { display: flex !important; }
@@ -2799,7 +2801,7 @@ export default function Dashboard() {
                         <div><label style={s.fieldLabel}>Endereço / Local</label><input style={s.inputEdit} value={formEditAbordagem.endereco || ''} onChange={e => setFormEditAbordagem(f => ({ ...f, endereco: e.target.value }))} /></div>
                         <div><label style={s.fieldLabel}>Data e hora</label><input style={s.inputEdit} type="datetime-local" value={formEditAbordagem.data_hora || ''} onChange={e => setFormEditAbordagem(f => ({ ...f, data_hora: e.target.value }))} /></div>
                         <div><label style={s.fieldLabel}>Observação</label><textarea style={{ ...s.inputEdit, minHeight: '60px', resize: 'vertical' }} value={formEditAbordagem.observacao || ''} onChange={e => setFormEditAbordagem(f => ({ ...f, observacao: e.target.value }))} /></div>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <div className="edit-abordagem-btns" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                           <button style={{ ...s.editBtn, background: '#ef4444', color: '#fff', border: 'none' }} onClick={() => setConfirmExcluirAbordagem(true)}>Excluir</button>
                           <button style={s.backBtn} onClick={() => setEditandoAbordagem(false)}>Cancelar</button>
                           <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarEdicaoAbordagem} disabled={salvandoEditAbordagem}>{salvandoEditAbordagem ? 'Salvando...' : 'Salvar'}</button>
@@ -2883,11 +2885,11 @@ export default function Dashboard() {
                               )}
                             </div>
                             <div><label style={s.fieldLabel}>Observação</label><input style={s.inputEdit} value={formEditEvangelizado.observacao || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, observacao: e.target.value }))} /></div>
-                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                              <button style={{ ...s.editBtn, background: '#ef4444', color: '#fff', border: 'none' }} onClick={() => setConfirmExcluirEvangelizado(ev)}>Excluir</button>
-                              <button style={{ ...s.editBtn, background: '#0f1117', color: '#fff', border: 'none' }} onClick={() => { setEditandoEvangelizado(null); setModalVincularDependente(ev); setNovoResponsavelId(ev.responsavel_id || '') }}>Vincular</button>
-                              <button style={s.backBtn} onClick={() => { setEditandoEvangelizado(null); setFormEditEvangelizado({}); setSugestoesEditEvangelizado([]); setEditEvangelizadoEnderecoConfirmado(false) }}>Cancelar</button>
-                              <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarEdicaoEvangelizado} disabled={salvandoEvangelizado}>{salvandoEvangelizado ? 'Salvando...' : 'Salvar'}</button>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                              <button style={{ ...s.editBtn, background: '#374151', color: '#fff', border: 'none', textAlign: 'center' }} onClick={() => { setEditandoEvangelizado(null); setModalVincularDependente(ev); setNovoResponsavelId(ev.responsavel_id || '') }}>Vincular</button>
+                              <button style={{ ...s.editBtn, background: '#ef4444', color: '#fff', border: 'none', textAlign: 'center' }} onClick={() => setConfirmExcluirEvangelizado(ev)}>Excluir</button>
+                              <button style={{ ...s.backBtn, textAlign: 'center' }} onClick={() => { setEditandoEvangelizado(null); setFormEditEvangelizado({}); setSugestoesEditEvangelizado([]); setEditEvangelizadoEnderecoConfirmado(false) }}>Cancelar</button>
+                              <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', textAlign: 'center' }} onClick={salvarEdicaoEvangelizado} disabled={salvandoEvangelizado}>{salvandoEvangelizado ? 'Salvando...' : 'Salvar'}</button>
                             </div>
                           </div>
                         ) : (
