@@ -15,10 +15,22 @@ export function AuthProvider({ children }) {
       setLoading(false)
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        const u = session.user
+        const isGoogle = u.app_metadata?.provider === 'google'
+        if (isGoogle) {
+          const { data: existing } = await supabase.from('usuarios').select('id').eq('id', u.id).single()
+          if (!existing) {
+            const nome = u.user_metadata?.full_name || u.email?.split('@')[0] || ''
+            await supabase.from('usuarios').insert({ id: u.id, nome, email: u.email, perfil: 'voluntario', ativo: false })
+          }
+        }
+      }
     })
 
     return () => subscription.unsubscribe()
