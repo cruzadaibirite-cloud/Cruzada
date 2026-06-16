@@ -10,10 +10,15 @@ export default function ProtectedRoute({ children }) {
 
   useEffect(() => {
     if (!user) { setCheckando(false); return }
-    supabase.from('usuarios').select('ativo').eq('id', user.id).single().then(({ data }) => {
-      setAtivo(data?.ativo ?? null)
+    const check = () => supabase.from('usuarios').select('ativo').eq('id', user.id).single().then(({ data }) => {
+      if (!data) {
+        setTimeout(check, 800)
+        return
+      }
+      setAtivo(data.ativo === true ? true : false)
       setCheckando(false)
     })
+    check()
   }, [user])
 
   if (loading || checkando) {
