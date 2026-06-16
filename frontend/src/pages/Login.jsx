@@ -58,6 +58,16 @@ export default function Login() {
   const [fade, setFade] = useState(true)
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  const [aguardando, setAguardando] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session?.user) return
+      const { data } = await supabase.from('usuarios').select('ativo').eq('id', session.user.id).single()
+      if (data?.ativo === true) { navigate('/sistema'); return }
+      if (data?.ativo === false) { setAguardando(true) }
+    })
+  }, [])
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -88,7 +98,7 @@ export default function Login() {
   async function handleGoogle() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/sistema/voluntario` }
+      options: { redirectTo: `${window.location.origin}/login` }
     })
   }
 
@@ -132,6 +142,23 @@ export default function Login() {
   }
 
   const verse = VERSES[verseIdx]
+
+  if (aguardando) return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#0f1117', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', fontFamily: "'Nunito', sans-serif" }}>
+      <div style={{ background: '#fff', borderRadius: '20px', maxWidth: '440px', width: '100%', padding: '40px', textAlign: 'center', boxShadow: '0 16px 64px rgba(0,0,0,0.3)' }}>
+        <div style={{ width: '64px', height: '64px', background: '#fff4ec', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F97310" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <h2 style={{ fontSize: '20px', fontWeight: 900, color: '#0f1117', margin: '0 0 10px' }}>Solicitação enviada!</h2>
+        <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: 1.7, margin: '0 0 24px' }}>
+          Sua conta foi criada com sucesso. Aguarde a aprovação do administrador para acessar a plataforma.
+        </p>
+        <button onClick={async () => { await supabase.auth.signOut(); setAguardando(false) }} style={{ background: '#F97310', color: '#fff', border: 'none', borderRadius: '50px', padding: '12px 32px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", letterSpacing: '1px', textTransform: 'uppercase' }}>
+          Voltar ao login
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <div style={s.page} className="login-page">
