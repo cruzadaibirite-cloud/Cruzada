@@ -14,6 +14,7 @@ const MENU = [
   { key: 'pessoas', label: 'Pessoas', path: '/sistema/pessoas' },
   { key: 'mapa', label: 'Mapa', path: '/sistema/mapa' },
   { key: 'treinamento', label: 'Treinamento', path: '/sistema/treinamento' },
+  { key: 'grupos', label: 'Grupos', path: '/sistema/grupos' },
   { key: 'dashboard', label: 'Dashboard', path: '/sistema/dashboard' },
 ]
 
@@ -64,10 +65,11 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = () => window.innerWidth < 768
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : (location.pathname === '/sistema/usuarios' || location.pathname.startsWith('/sistema/usuarios/')) ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
+  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : (location.pathname === '/sistema/usuarios' || location.pathname.startsWith('/sistema/usuarios/')) ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/grupos' || location.pathname.startsWith('/sistema/grupos/') ? 'grupos' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
   const isNovaAbordagemPage = location.pathname === '/sistema/evangelismo/nova-abordagem'
   const pessoaIdPage = location.pathname.startsWith('/sistema/pessoas/') ? location.pathname.split('/sistema/pessoas/')[1] : null
   const usuarioIdPage = location.pathname.startsWith('/sistema/usuarios/') ? location.pathname.split('/sistema/usuarios/')[1] : null
+  const grupoIdPage = location.pathname.startsWith('/sistema/grupos/') ? location.pathname.split('/sistema/grupos/')[1] : null
   const [voluntarios, setVoluntarios] = useState([])
   const [loadingVol, setLoadingVol] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -85,6 +87,10 @@ export default function Dashboard() {
   const [alertaCampos, setAlertaCampos] = useState(null)
   const [editando, setEditando] = useState(false)
   const [formEdit, setFormEdit] = useState({})
+  const [novoVoluntario, setNovoVoluntario] = useState(false)
+  const [formNovoVol, setFormNovoVol] = useState({ nome_completo: '', idade: '', sexo: '', whatsapp: '', instagram: '', cidade_estado_pais: '', igreja: '', nome_pastor: '', contato_pastor_lider: '', como_serve_igreja: '', tempo_na_igreja: '', estado_civil: '', conjuge_na_missao: '', motivo_conjuge_ausente: '', nome_emergencia: '', telefone_emergencia: '', limitacao_fisica: '', ja_participou_missao: '', fala_ingles: false, fala_espanhol: false, canta: false, toca_instrumento: false, tira_fotos: false, faz_filmagens: false, outras_competencias: false, outra_competencia_descricao: '' })
+  const [salvandoNovoVol, setSalvandoNovoVol] = useState(false)
+  const [erroNovoVol, setErroNovoVol] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [locais, setLocais] = useState([])
   const [buscaLocal, setBuscaLocal] = useState('')
@@ -125,6 +131,20 @@ export default function Dashboard() {
   const [formEvento, setFormEvento] = useState({ titulo: '', data: '', horaInicio: '', horaFim: '', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', equipeId: null })
   const [equipes, setEquipes] = useState([])
   const [grupos, setGrupos] = useState([])
+  const [modalNovoGrupo, setModalNovoGrupo] = useState(false)
+  const [nomeNovoGrupo, setNomeNovoGrupo] = useState('')
+  const [grupoAtivo, setGrupoAtivo] = useState(null)
+  const [mensagensGrupo, setMensagensGrupo] = useState([])
+  const [novaMensagem, setNovaMensagem] = useState('')
+  const [enviandoMensagem, setEnviandoMensagem] = useState(false)
+  const [papelNoGrupo, setPapelNoGrupo] = useState(null)
+  const chatEndRef = useRef(null)
+  const [menuGrupoAberto, setMenuGrupoAberto] = useState(false)
+  const [modalEditarGrupo, setModalEditarGrupo] = useState(false)
+  const [nomeEditarGrupo, setNomeEditarGrupo] = useState('')
+  const [modalMembrosGrupo, setModalMembrosGrupo] = useState(false)
+  const [membrosGrupo, setMembrosGrupo] = useState([])
+  const [confirmExcluirGrupo, setConfirmExcluirGrupo] = useState(false)
   const [organizacoes, setOrganizacoes] = useState([])
   const [agendaDiaSelecionado, setAgendaDiaSelecionado] = useState(null) // { diaObj, evsDia }
   const [agendaDiaModal, setAgendaDiaModal] = useState(null) // modal da lista do dia
@@ -208,7 +228,6 @@ export default function Dashboard() {
   const [novoResponsavelId, setNovoResponsavelId] = useState('')
   const [confirmExcluirEvangelizado, setConfirmExcluirEvangelizado] = useState(null)
   const [confirmExcluirAbordagem, setConfirmExcluirAbordagem] = useState(false)
-  const chatEndRef = useRef(null)
   const mapaLocalRef = useRef(null)
 
   async function carregarPessoasKanban() {
@@ -239,6 +258,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
+    if (menu === 'grupos') carregarGrupos()
+    if (menu === 'grupos' && !grupoIdPage) setGrupoAtivo(null)
     if (menu === 'locais' || menu === 'agenda') carregarLocais()
     if (menu === 'agenda') { carregarEventos(); carregarEquipes() }
     if (menu === 'evangelismo') { carregarAbordagens(); carregarEquipes(); if (user?.id) carregarOrgsUsuario(user.id) }
@@ -278,6 +299,37 @@ export default function Dashboard() {
     }
     if (!usuarioIdPage) setSelectedUsuario(null)
   }, [usuarioIdPage, usuarios])
+
+  useEffect(() => {
+    if (!grupoIdPage) { setGrupoAtivo(null); return }
+    async function carregarChat() {
+      const g = grupos.find(x => x.id === grupoIdPage)
+      if (g) setGrupoAtivo(g)
+      else {
+        const { data } = await supabase.from('grupos').select('*').eq('id', grupoIdPage).single()
+        if (data) setGrupoAtivo(data)
+      }
+      const { data: msgs } = await supabase.from('mensagens_grupo').select('*, usuarios(nome)').eq('grupo_id', grupoIdPage).order('criado_em', { ascending: true })
+      setMensagensGrupo(msgs || [])
+      const { data: membroData } = await supabase.from('usuario_grupos').select('papel').eq('grupo_id', grupoIdPage).eq('usuario_id', user?.id).single()
+      setPapelNoGrupo(membroData?.papel || null)
+    }
+    carregarChat()
+  }, [grupoIdPage, user])
+
+  useEffect(() => {
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
+  }, [mensagensGrupo])
+
+  async function enviarMensagem() {
+    if (!novaMensagem.trim() || !grupoIdPage) return
+    setEnviandoMensagem(true)
+    await supabase.from('mensagens_grupo').insert({ grupo_id: grupoIdPage, usuario_id: user.id, mensagem: novaMensagem.trim() })
+    const { data: msgs } = await supabase.from('mensagens_grupo').select('*, usuarios(nome)').eq('grupo_id', grupoIdPage).order('criado_em', { ascending: true })
+    setMensagensGrupo(msgs || [])
+    setNovaMensagem('')
+    setEnviandoMensagem(false)
+  }
 
   useEffect(() => {
     if (modalPessoa) {
@@ -421,6 +473,47 @@ export default function Dashboard() {
       setEditando(false)
       setFormEdit({})
     }
+  }
+
+  async function salvarNovoVoluntario() {
+    setSalvandoNovoVol(true)
+    setErroNovoVol('')
+    const f = formNovoVol
+    const payload = {
+      nome_completo: f.nome_completo,
+      idade: parseInt(f.idade) || null,
+      sexo: f.sexo || null,
+      whatsapp: f.whatsapp,
+      instagram: f.instagram || null,
+      cidade_estado_pais: f.cidade_estado_pais,
+      igreja: f.igreja,
+      nome_pastor: f.nome_pastor || null,
+      contato_pastor_lider: f.contato_pastor_lider,
+      como_serve_igreja: f.como_serve_igreja,
+      tempo_na_igreja: f.tempo_na_igreja,
+      estado_civil: f.estado_civil,
+      conjuge_na_missao: f.estado_civil === 'casado' ? (f.conjuge_na_missao === 'sim') : null,
+      motivo_conjuge_ausente: f.motivo_conjuge_ausente || null,
+      nome_emergencia: f.nome_emergencia || null,
+      telefone_emergencia: f.telefone_emergencia || null,
+      limitacao_fisica: f.limitacao_fisica || null,
+      ja_participou_missao: f.ja_participou_missao === 'sim',
+      fala_ingles: !!f.fala_ingles,
+      fala_espanhol: !!f.fala_espanhol,
+      canta: !!f.canta,
+      toca_instrumento: !!f.toca_instrumento,
+      tira_fotos: !!f.tira_fotos,
+      faz_filmagens: !!f.faz_filmagens,
+      outras_competencias: !!f.outras_competencias,
+      outra_competencia_descricao: f.outra_competencia_descricao || null,
+      status: 'pendente',
+    }
+    const { error } = await supabase.from('voluntarios').insert([payload])
+    setSalvandoNovoVol(false)
+    if (error) { setErroNovoVol('Erro ao cadastrar. Tente novamente.'); return }
+    await carregarVoluntarios()
+    setNovoVoluntario(false)
+    setFormNovoVol({ nome_completo: '', idade: '', sexo: '', whatsapp: '', instagram: '', cidade_estado_pais: '', igreja: '', nome_pastor: '', contato_pastor_lider: '', como_serve_igreja: '', tempo_na_igreja: '', estado_civil: '', conjuge_na_missao: '', motivo_conjuge_ausente: '', nome_emergencia: '', telefone_emergencia: '', limitacao_fisica: '', ja_participou_missao: '', fala_ingles: false, fala_espanhol: false, canta: false, toca_instrumento: false, tira_fotos: false, faz_filmagens: false, outras_competencias: false, outra_competencia_descricao: '' })
   }
 
   async function criarUsuario() {
@@ -883,6 +976,8 @@ export default function Dashboard() {
           .dash-form-section { padding: 16px 14px !important; overflow: hidden; max-width: 100%; }
           .dash-form-section input, .dash-form-section textarea { max-width: 100% !important; box-sizing: border-box !important; width: 100% !important; }
           .usuarios-filtros { display: flex !important; }
+          .vol-header { flex-wrap: wrap !important; gap: 10px !important; }
+          .btn-novo-vol { width: 100% !important; text-align: center !important; justify-content: center !important; }
           .usuario-modal-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; }
           .usuario-modal-inner { border-radius: 0 !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; padding: 24px 20px 100px !important; overflow-y: visible !important; }
           .usuario-modal-voltar { display: flex !important; }
@@ -969,6 +1064,227 @@ export default function Dashboard() {
 
         {/* Conteúdo */}
         <div style={s.main} className="dash-main">
+
+          {menu === 'grupos' && grupoIdPage && grupoAtivo && (
+            <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                <button onClick={() => navigate('/sistema/grupos')} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Voltar
+                </button>
+                <div style={{ width: '36px', height: '36px', background: '#fff4ec', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F97310" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117' }}>{grupoAtivo.nome}</div>
+                  {papelNoGrupo && <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>{papelNoGrupo === 'admin' ? 'Administrador' : 'Membro'}</div>}
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <button onClick={() => setMenuGrupoAberto(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f1117', padding: '4px 8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+                  </button>
+                  {menuGrupoAberto && (
+                    <div style={{ position: 'absolute', top: '110%', right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', zIndex: 100, minWidth: '180px', overflow: 'hidden' }} onClick={() => setMenuGrupoAberto(false)}>
+                      <button onClick={() => { setNomeEditarGrupo(grupoAtivo.nome); setModalEditarGrupo(true) }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '12px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: '14px', fontWeight: 600, color: '#374151', cursor: 'pointer', fontFamily: 'inherit' }}
+                        onMouseEnter={e => e.currentTarget.style.background='#f9fafb'} onMouseLeave={e => e.currentTarget.style.background='none'}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Editar nome
+                      </button>
+                      <button onClick={async () => {
+                        const { data } = await supabase.from('usuario_grupos').select('papel, usuarios(id, nome)').eq('grupo_id', grupoAtivo.id)
+                        setMembrosGrupo(data || [])
+                        setModalMembrosGrupo(true)
+                      }} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '12px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: '14px', fontWeight: 600, color: '#374151', cursor: 'pointer', fontFamily: 'inherit' }}
+                        onMouseEnter={e => e.currentTarget.style.background='#f9fafb'} onMouseLeave={e => e.currentTarget.style.background='none'}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        Gerenciar membros
+                      </button>
+                      <button onClick={() => setConfirmExcluirGrupo(true)} style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '12px 16px', background: 'none', border: 'none', textAlign: 'left', fontSize: '14px', fontWeight: 600, color: '#ef4444', cursor: 'pointer', fontFamily: 'inherit' }}
+                        onMouseEnter={e => e.currentTarget.style.background='#fef2f2'} onMouseLeave={e => e.currentTarget.style.background='none'}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                        Excluir grupo
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Mensagens */}
+              <div style={{ flex: 1, overflowY: 'auto', background: '#f9fafb', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {mensagensGrupo.length === 0 && <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>Nenhuma mensagem ainda.</p>}
+                {mensagensGrupo.map(m => {
+                  const isMinha = m.usuario_id === user?.id
+                  const hora = new Date(m.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                  const data = new Date(m.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                  return (
+                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMinha ? 'flex-end' : 'flex-start' }}>
+                      {!isMinha && <div style={{ fontSize: '11px', fontWeight: 700, color: '#F97310', marginBottom: '3px' }}>{m.usuarios?.nome}</div>}
+                      <div style={{ background: isMinha ? '#F97310' : '#fff', color: isMinha ? '#fff' : '#0f1117', borderRadius: isMinha ? '16px 16px 4px 16px' : '16px 16px 16px 4px', padding: '10px 14px', maxWidth: '75%', fontSize: '14px', lineHeight: 1.5, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                        {m.mensagem}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px' }}>{data} {hora}</div>
+                    </div>
+                  )
+                })}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input */}
+              {papelNoGrupo === 'admin' ? (
+                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                  <input
+                    value={novaMensagem}
+                    onChange={e => setNovaMensagem(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && !e.shiftKey && enviarMensagem()}
+                    placeholder="Digite uma mensagem..."
+                    style={{ flex: 1, padding: '12px 16px', border: '1.5px solid #e5e7eb', borderRadius: '50px', fontSize: '14px', fontFamily: 'inherit', outline: 'none', color: '#0f1117' }}
+                  />
+                  <button onClick={enviarMensagem} disabled={enviandoMensagem || !novaMensagem.trim()} style={{ background: '#F97310', border: 'none', borderRadius: '50%', width: '46px', height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, opacity: (!novaMensagem.trim() || enviandoMensagem) ? 0.5 : 1 }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  </button>
+                </div>
+              ) : (
+                <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '13px', color: '#9ca3af', padding: '10px', background: '#f3f4f6', borderRadius: '8px' }}>
+                  Apenas administradores do grupo podem enviar mensagens.
+                </div>
+              )}
+
+              {/* Modal editar nome */}
+              {modalEditarGrupo && (
+                <div style={s.modalOverlay} onClick={() => setModalEditarGrupo(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Editar nome</h3>
+                    <label style={s.fieldLabel}>Nome do grupo</label>
+                    <input style={{ ...s.inputEdit, marginBottom: '20px' }} value={nomeEditarGrupo} onChange={e => setNomeEditarGrupo(e.target.value)} autoFocus />
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                      <button style={s.backBtn} onClick={() => setModalEditarGrupo(false)}>Cancelar</button>
+                      <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={async () => {
+                        if (!nomeEditarGrupo.trim()) return
+                        await supabase.from('grupos').update({ nome: nomeEditarGrupo.trim() }).eq('id', grupoAtivo.id)
+                        setGrupoAtivo(g => ({ ...g, nome: nomeEditarGrupo.trim() }))
+                        await carregarGrupos()
+                        setModalEditarGrupo(false)
+                      }}>Salvar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal gerenciar membros */}
+              {modalMembrosGrupo && (
+                <div style={s.modalOverlay} onClick={() => setModalMembrosGrupo(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Membros do grupo</h3>
+                    {membrosGrupo.length === 0 && <p style={{ color: '#9ca3af', fontSize: '14px' }}>Nenhum membro vinculado.</p>}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {membrosGrupo.map(m => (
+                        <div key={m.usuarios?.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#f9fafb', borderRadius: '10px' }}>
+                          <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117' }}>{m.usuarios?.nome}</span>
+                          <select value={m.papel} onChange={async e => {
+                            await supabase.from('usuario_grupos').update({ papel: e.target.value }).eq('grupo_id', grupoAtivo.id).eq('usuario_id', m.usuarios?.id)
+                            setMembrosGrupo(prev => prev.map(x => x.usuarios?.id === m.usuarios?.id ? { ...x, papel: e.target.value } : x))
+                          }} style={{ ...s.inputEdit, width: 'auto', padding: '6px 10px', fontSize: '13px' }}>
+                            <option value="membro">Membro</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                      <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={() => setModalMembrosGrupo(false)}>Fechar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal confirmar exclusão */}
+              {confirmExcluirGrupo && (
+                <div style={s.modalOverlay} onClick={() => setConfirmExcluirGrupo(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                    <div style={{ fontSize: '40px', marginBottom: '12px' }}>🗑️</div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '8px' }}>Excluir grupo?</h3>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>O grupo <strong>{grupoAtivo.nome}</strong> e todas as mensagens serão excluídos permanentemente.</p>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                      <button style={s.backBtn} onClick={() => setConfirmExcluirGrupo(false)}>Cancelar</button>
+                      <button style={{ ...s.editBtn, background: '#ef4444', color: '#fff' }} onClick={async () => {
+                        await supabase.from('grupos').delete().eq('id', grupoAtivo.id)
+                        await carregarGrupos()
+                        setConfirmExcluirGrupo(false)
+                        navigate('/sistema/grupos')
+                      }}>Excluir</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {menu === 'grupos' && !grupoIdPage && (
+            <div>
+              <div className="vol-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <h2 style={{ ...s.pageTitle, margin: 0 }}>Grupos</h2>
+                <button className="btn-novo-vol" onClick={() => setModalNovoGrupo(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff' }}>+ Novo Grupo</button>
+              </div>
+              {(() => {
+                const descricoes = {
+                  'Alinhamento': 'Alinharemos diretrizes e comunicação entre as equipes da missão.',
+                  'Geral': 'Faremos parte do grupo central que envolverá todos os participantes da Cruzada.',
+                  'Escolas': 'Atuaremos em escolas e instituições de ensino com atividades missionárias.',
+                  'Mídia': 'Produziremos fotos, vídeos e conteúdo para registrar e divulgar a missão.',
+                  'Alimentação': 'Organizaremos e distribuiremos refeições para a equipe durante a Cruzada.',
+                  'Administração': 'Cuidaremos da logística, finanças e organização geral do evento.',
+                  'Mapeamento': 'Realizaremos o levantamento de locais e pessoas para as abordagens.',
+                  'Cultos': 'Seremos responsáveis pela programação e execução dos cultos e momentos de adoração.',
+                  'Devocional': 'Conduziremos momentos de oração e devoção diária com a equipe.',
+                  'Social': 'Desenvolveremos ações sociais e de cuidado com a comunidade local.',
+                  'Consolidação': 'Acompanharemos e discipularemos os novos convertidos após as abordagens.',
+                  'Evangelismo': 'Realizaremos abordagens diretas e compartilharemos o evangelho nas ruas.',
+                }
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                    {grupos.map(g => (
+                      <div key={g.id} onClick={() => navigate(`/sistema/grupos/${g.id}`)} style={{ background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column', gap: '12px', cursor: 'pointer' }} onMouseEnter={e => e.currentTarget.style.background='#fff4ec'} onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                        <div style={{ width: '40px', height: '40px', background: '#fff4ec', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F97310" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '15px', fontWeight: 800, color: '#0f1117', marginBottom: '6px' }}>{g.nome}</div>
+                          <div style={{ fontSize: '13px', color: '#6b7280', lineHeight: 1.5 }}>{descricoes[g.nome] || 'Grupo de apoio à missão da Cruzada Ibirité 2026.'}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+
+              {modalNovoGrupo && (
+                <div style={s.modalOverlay} onClick={() => setModalNovoGrupo(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Novo Grupo</h3>
+                    <label style={s.fieldLabel}>Nome do grupo</label>
+                    <input
+                      style={{ ...s.inputEdit, marginBottom: '20px' }}
+                      value={nomeNovoGrupo}
+                      onChange={e => setNomeNovoGrupo(e.target.value)}
+                      placeholder="Ex: Intercessão"
+                      autoFocus
+                    />
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                      <button style={s.backBtn} onClick={() => { setModalNovoGrupo(false); setNomeNovoGrupo('') }}>Cancelar</button>
+                      <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={async () => {
+                        if (!nomeNovoGrupo.trim()) return
+                        await supabase.from('grupos').insert({ nome: nomeNovoGrupo.trim() })
+                        await carregarGrupos()
+                        setModalNovoGrupo(false)
+                        setNomeNovoGrupo('')
+                      }}>Salvar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {menu === 'treinamento' && (() => {
             const VIDEOS = [
@@ -1295,9 +1611,12 @@ export default function Dashboard() {
             )
           })()}
 
-          {menu === 'voluntarios' && !selected && (
+          {menu === 'voluntarios' && !selected && !novoVoluntario && (
             <>
-              <h2 style={s.pageTitle}>Voluntários</h2>
+              <div className="vol-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <h2 style={{ ...s.pageTitle, margin: 0 }}>Voluntários</h2>
+                <button className="btn-novo-vol" onClick={() => setNovoVoluntario(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff' }}>+ Novo Voluntário</button>
+              </div>
               {loadingVol && <p style={s.info}>Carregando...</p>}
 
               {!loadingVol && voluntarios.length === 0 && <p style={s.info}>Nenhum voluntário cadastrado ainda.</p>}
@@ -1307,6 +1626,108 @@ export default function Dashboard() {
                 ))}
               </div>
             </>
+          )}
+
+          {menu === 'voluntarios' && novoVoluntario && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <button onClick={() => { setNovoVoluntario(false); setErroNovoVol('') }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Voltar
+                </button>
+              </div>
+
+              {/* Dados Pessoais */}
+              <div style={s.formSection} className="dash-form-section">
+                <h3 style={s.formSectionTitle}>Dados Pessoais</h3>
+                <div style={s.formGrid} className="dash-form-grid">
+                  {editField('Nome Completo', 'nome_completo', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  {editField('Idade', 'idade', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})), 'number')}
+                  <div>
+                    <label style={s.fieldLabel}>Sexo</label>
+                    <select style={s.inputEdit} value={formNovoVol.sexo || ''} onChange={e => setFormNovoVol(f=>({...f,sexo:e.target.value}))}>
+                      <option value="">Selecione</option>
+                      <option value="masculino">Masculino</option>
+                      <option value="feminino">Feminino</option>
+                    </select>
+                  </div>
+                  {editField('WhatsApp', 'whatsapp', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  {editField('Instagram', 'instagram', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  {editField('Cidade / Estado / País', 'cidade_estado_pais', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  <div>
+                    <label style={s.fieldLabel}>Estado Civil</label>
+                    <select style={s.inputEdit} value={formNovoVol.estado_civil || ''} onChange={e => setFormNovoVol(f=>({...f,estado_civil:e.target.value}))}>
+                      <option value="">Selecione</option>
+                      <option value="solteiro">Solteiro</option>
+                      <option value="casado">Casado</option>
+                    </select>
+                  </div>
+                  {formNovoVol.estado_civil === 'casado' && (
+                    <div>
+                      <label style={s.fieldLabel}>Cônjuge vai na missão?</label>
+                      <select style={s.inputEdit} value={formNovoVol.conjuge_na_missao || ''} onChange={e => setFormNovoVol(f=>({...f,conjuge_na_missao:e.target.value}))}>
+                        <option value="">Selecione</option>
+                        <option value="sim">Sim</option>
+                        <option value="nao">Não</option>
+                      </select>
+                    </div>
+                  )}
+                  {formNovoVol.estado_civil === 'casado' && formNovoVol.conjuge_na_missao === 'nao' && editField('Por que o cônjuge não irá?', 'motivo_conjuge_ausente', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                </div>
+              </div>
+
+              {/* Igreja */}
+              <div style={{ ...s.formSection, marginTop: '16px' }} className="dash-form-section">
+                <h3 style={s.formSectionTitle}>Igreja</h3>
+                <div style={s.formGrid} className="dash-form-grid">
+                  {editField('Nome da Igreja', 'igreja', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  {editField('Nome do Pastor / Líder', 'nome_pastor', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  {editField('Telefone do Pastor / Líder', 'contato_pastor_lider', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  {editField('Como serve na igreja?', 'como_serve_igreja', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  {editField('Há quanto tempo está na igreja?', 'tempo_na_igreja', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                </div>
+              </div>
+
+              {/* Saúde e Experiência */}
+              <div style={{ ...s.formSection, marginTop: '16px' }} className="dash-form-section">
+                <h3 style={s.formSectionTitle}>Saúde e Experiência</h3>
+                <div style={s.formGrid} className="dash-form-grid">
+                  {editField('Nome de Emergência', 'nome_emergencia', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  {editField('Telefone de Emergência', 'telefone_emergencia', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  {editField('Limitação física / Medicação', 'limitacao_fisica', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+                  <div>
+                    <label style={s.fieldLabel}>Já foi em missão?</label>
+                    <select style={s.inputEdit} value={formNovoVol.ja_participou_missao || ''} onChange={e => setFormNovoVol(f=>({...f,ja_participou_missao:e.target.value}))}>
+                      <option value="">Selecione</option>
+                      <option value="sim">Sim</option>
+                      <option value="nao">Não</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Competências */}
+              <div style={{ ...s.formSection, marginTop: '16px' }} className="dash-form-section">
+                <h3 style={s.formSectionTitle}>Competências</h3>
+                <div style={s.checkGrid} className="dash-check-grid">
+                  {[{k:'fala_ingles',l:'Fala Inglês'},{k:'fala_espanhol',l:'Fala Espanhol'},{k:'canta',l:'Canta'},{k:'toca_instrumento',l:'Toca instrumento'},{k:'tira_fotos',l:'Tira fotos'},{k:'faz_filmagens',l:'Faz filmagens'},{k:'outras_competencias',l:'Outros'}].map(({k,l}) => (
+                    <label key={k} style={{ ...s.checkLabel, cursor:'pointer' }}>
+                      <input type="checkbox" checked={!!formNovoVol[k]} onChange={e => setFormNovoVol(f=>({...f,[k]:e.target.checked}))} style={s.checkbox} />
+                      {l}
+                    </label>
+                  ))}
+                </div>
+                {formNovoVol.outras_competencias && editField('Descreva a competência', 'outra_competencia_descricao', formNovoVol, (k,v) => setFormNovoVol(f=>({...f,[k]:v})))}
+              </div>
+
+              {erroNovoVol && <p style={{ color: '#ef4444', fontSize: '14px', fontWeight: 600, marginTop: '12px' }}>{erroNovoVol}</p>}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <button style={s.backBtn} onClick={() => { setNovoVoluntario(false); setErroNovoVol('') }}>Cancelar</button>
+                <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarNovoVoluntario} disabled={salvandoNovoVol}>
+                  {salvandoNovoVol ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </div>
           )}
 
           {menu === 'voluntarios' && selected && (
@@ -3059,9 +3480,9 @@ export default function Dashboard() {
                 </>
               ) : (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
+                  <div className="vol-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                     <h2 style={{ ...s.pageTitle, marginBottom: 0 }}>Evangelismo</h2>
-                    <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={() => {
+                    <button className="btn-novo-vol" style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={() => {
                       const agora = new Date()
                       const dataHoraLocal = `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}-${String(agora.getDate()).padStart(2,'0')}T${String(agora.getHours()).padStart(2,'0')}:${String(agora.getMinutes()).padStart(2,'0')}`
                       setFormAbordagem(f => ({ ...f, data_hora: dataHoraLocal }))
@@ -3351,6 +3772,7 @@ export default function Dashboard() {
               { key: 'pessoas', path: '/sistema/pessoas', label: 'Pessoas' },
               { key: 'mapa', path: '/sistema/mapa', label: 'Mapa' },
               { key: 'treinamento', path: '/sistema/treinamento', label: 'Treinamento' },
+              { key: 'grupos', path: '/sistema/grupos', label: 'Grupos' },
               { key: 'dashboard', path: '/sistema/dashboard', label: 'Dashboard' },
             ].map(item => (
               <button key={item.key} onClick={() => { navigate(item.path); setMenuMobileAberto(false) }}

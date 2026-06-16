@@ -16,6 +16,7 @@ export default function App() {
         <Route path="/sistema" element={<ProtectedRoute><Navigate to="/sistema/voluntario" replace /></ProtectedRoute>} />
         <Route path="/sistema/voluntario" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/usuarios" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/sistema/usuarios/:usuarioId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/locais" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/agenda" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/evangelismo" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -24,6 +25,8 @@ export default function App() {
         <Route path="/sistema/pessoas/:pessoaId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/mapa" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/treinamento" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/sistema/grupos" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/sistema/grupos/:grupoId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
