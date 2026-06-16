@@ -64,9 +64,10 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = () => window.innerWidth < 768
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : location.pathname === '/sistema/usuarios' ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
+  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : (location.pathname === '/sistema/usuarios' || location.pathname.startsWith('/sistema/usuarios/')) ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
   const isNovaAbordagemPage = location.pathname === '/sistema/evangelismo/nova-abordagem'
   const pessoaIdPage = location.pathname.startsWith('/sistema/pessoas/') ? location.pathname.split('/sistema/pessoas/')[1] : null
+  const usuarioIdPage = location.pathname.startsWith('/sistema/usuarios/') ? location.pathname.split('/sistema/usuarios/')[1] : null
   const [voluntarios, setVoluntarios] = useState([])
   const [loadingVol, setLoadingVol] = useState(false)
   const [selected, setSelected] = useState(null)
@@ -110,6 +111,7 @@ export default function Dashboard() {
   const [buscaVoluntario, setBuscaVoluntario] = useState('')
   const [sugestoesVoluntario, setSugestoesVoluntario] = useState([])
   const [usuarioOrgs, setUsuarioOrgs] = useState({ equipes: [], grupos: [] })
+  const [showDetalheUsuario, setShowDetalheUsuario] = useState(false)
 
   // Agenda
   const hoje = new Date()
@@ -265,6 +267,17 @@ export default function Dashboard() {
     }
     if (!pessoaIdPage) setModalPessoa(null)
   }, [pessoaIdPage, pessoasKanban])
+
+  useEffect(() => {
+    if (usuarioIdPage && usuarios.length > 0) {
+      const u = usuarios.find(x => x.id === usuarioIdPage)
+      if (u) {
+        setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); setErroEquipeObrigatoria(false)
+        carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos()
+      }
+    }
+    if (!usuarioIdPage) setSelectedUsuario(null)
+  }, [usuarioIdPage, usuarios])
 
   useEffect(() => {
     if (modalPessoa) {
@@ -464,8 +477,13 @@ export default function Dashboard() {
   async function buscarVoluntariosParaVinculo(texto) {
     setBuscaVoluntario(texto)
     if (texto.length < 2) { setSugestoesVoluntario([]); return }
-    const { data } = await supabase.from('voluntarios').select('id, nome_completo').ilike('nome_completo', `%${texto}%`).limit(8)
-    setSugestoesVoluntario(data || [])
+    const [porNome, porTelefone] = await Promise.all([
+      supabase.from('voluntarios').select('id, nome_completo, whatsapp').ilike('nome_completo', `%${texto}%`).limit(5),
+      supabase.from('voluntarios').select('id, nome_completo, whatsapp').ilike('whatsapp', `%${texto}%`).limit(5),
+    ])
+    const todos = [...(porNome.data || []), ...(porTelefone.data || [])]
+    const unicos = todos.filter((v, i, arr) => arr.findIndex(x => x.id === v.id) === i).slice(0, 8)
+    setSugestoesVoluntario(unicos)
   }
 
   async function ativarUsuario(u) {
@@ -865,6 +883,10 @@ export default function Dashboard() {
           .dash-form-section { padding: 16px 14px !important; overflow: hidden; max-width: 100%; }
           .dash-form-section input, .dash-form-section textarea { max-width: 100% !important; box-sizing: border-box !important; width: 100% !important; }
           .usuarios-filtros { display: flex !important; }
+          .usuario-modal-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; }
+          .usuario-modal-inner { border-radius: 0 !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; padding: 24px 20px 100px !important; overflow-y: visible !important; }
+          .usuario-modal-voltar { display: flex !important; }
+          .usuario-modal-close { display: none !important; }
         }
         @media (min-width: 769px) {
           .dash-bottomnav { display: none !important; }
@@ -3155,9 +3177,15 @@ export default function Dashboard() {
               {loadingUsers && <p style={s.info}>Carregando...</p>}
               {!loadingUsers && usuarios.length === 0 && <p style={s.info}>Nenhum usuário cadastrado.</p>}
               {selectedUsuario && (
-                <div style={s.modalOverlay} onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setErroEquipeObrigatoria(false) }}>
-                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setErroEquipeObrigatoria(false) }} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151' }}>✕</button>
+                <div className="usuario-modal-overlay" style={s.modalOverlay} onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setErroEquipeObrigatoria(false); setShowDetalheUsuario(false); if (usuarioIdPage) navigate('/sistema/usuarios') }}>
+                  <div className="usuario-modal-inner" style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                    <div className="usuario-modal-voltar" style={{ display: 'none', marginBottom: '16px' }}>
+                      <button onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setErroEquipeObrigatoria(false); setShowDetalheUsuario(false); navigate('/sistema/usuarios') }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        Voltar
+                      </button>
+                    </div>
+                    <button className="usuario-modal-close" onClick={() => { setSelectedUsuario(null); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setErroEquipeObrigatoria(false); setShowDetalheUsuario(false); if (usuarioIdPage) navigate('/sistema/usuarios') }} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151' }}>✕</button>
 
                     {/* Header */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '24px' }}>
@@ -3165,13 +3193,35 @@ export default function Dashboard() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: '17px', fontWeight: 800, color: '#0f1117' }}>{selectedUsuario.nome}</div>
                         <div style={{ fontSize: '13px', color: '#6b7280' }}>{selectedUsuario.email}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: selectedUsuario.ativo ? '#16a34a' : '#dc2626', background: selectedUsuario.ativo ? '#dcfce7' : '#fee2e2', borderRadius: '20px', padding: '2px 10px' }}>
-                            {selectedUsuario.ativo ? 'Ativo' : 'Inativo'}
-                          </span>
-                        </div>
+                        {selectedUsuario.telefone && <div style={{ fontSize: '13px', color: '#6b7280' }}>{selectedUsuario.telefone}</div>}
                       </div>
                     </div>
+
+                    {showDetalheUsuario && (
+                      <div style={{ marginBottom: '20px', background: '#f9fafb', borderRadius: '12px', padding: '16px', border: '1px solid #e5e7eb' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                          <div style={{ fontSize: '12px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>Informações cadastrais</div>
+                          <button onClick={() => setShowDetalheUsuario(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '16px', fontWeight: 700 }}>✕</button>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {[
+                            ['Nome', selectedUsuario.nome],
+                            ['E-mail', selectedUsuario.email],
+                            ['Telefone', selectedUsuario.telefone || '—'],
+                            ['Perfil', selectedUsuario.perfil],
+                            ['Status', selectedUsuario.ativo ? 'Ativo' : 'Inativo'],
+                            ['Cadastrado em', selectedUsuario.criado_em ? new Date(selectedUsuario.criado_em).toLocaleDateString('pt-BR') : '—'],
+                            ['Equipes', usuarioOrgs.equipes.length > 0 ? equipes.filter(e => usuarioOrgs.equipes.includes(e.id)).map(e => e.nome).join(', ') : '—'],
+                            ['Grupos', usuarioOrgs.grupos.length > 0 ? grupos.filter(g => usuarioOrgs.grupos.includes(g.id)).map(g => g.nome).join(', ') : '—'],
+                          ].map(([label, value]) => (
+                            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '13px' }}>
+                              <span style={{ fontWeight: 700, color: '#6b7280', flexShrink: 0 }}>{label}</span>
+                              <span style={{ color: '#0f1117', fontWeight: 600, textAlign: 'right' }}>{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {!confirmDeleteUsuario ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -3217,8 +3267,8 @@ export default function Dashboard() {
                           <div style={{ position: 'relative' }}>
                             <label style={s.fieldLabel}>Vincular voluntário</label>
                             <input
-                              style={s.inputEdit}
-                              placeholder="Buscar pelo nome..."
+                              style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: '#1a1d27', outline: 'none', boxSizing: 'border-box', marginTop: '6px' }}
+                              placeholder="Buscar voluntário..."
                               value={buscaVoluntario}
                               onChange={e => buscarVoluntariosParaVinculo(e.target.value)}
                               onBlur={() => setTimeout(() => setSugestoesVoluntario([]), 200)}
@@ -3237,7 +3287,7 @@ export default function Dashboard() {
                                     setBuscaVoluntario('')
                                     setSugestoesVoluntario([])
                                   }} style={{ padding: '9px 14px', fontSize: '13px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', color: '#1a1d27' }}>
-                                    {vol.nome_completo}
+                                    <div style={{ fontWeight: 700 }}>{vol.nome_completo}</div>
                                   </li>
                                 ))}
                               </ul>
@@ -3273,7 +3323,7 @@ export default function Dashboard() {
                   if (filtroUsuarioGrupo && !(u.grupos || []).includes(filtroUsuarioGrupo)) return false
                   return true
                 }).map(u => (
-                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={async () => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); setErroEquipeObrigatoria(false); const orgs = await carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos() }}>
+                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={() => navigate(`/sistema/usuarios/${u.id}`)}>
                     <div style={s.cardAvatar}>{u.nome?.[0]?.toUpperCase()}</div>
                     <div style={s.cardInfo}>
                       <div style={s.cardNome}>{(() => { const p = (u.nome || '').trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0] })()}</div>
