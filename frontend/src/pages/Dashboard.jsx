@@ -6,18 +6,22 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const MENU = [
-  { key: 'voluntarios', label: 'Voluntários', path: '/sistema/voluntario' },
-  { key: 'usuarios', label: 'Usuários', path: '/sistema/usuarios' },
-  { key: 'locais', label: 'Locais', path: '/sistema/locais' },
-  { key: 'agenda', label: 'Agenda', path: '/sistema/agenda' },
-  { key: 'evangelismo', label: 'Evangelismo', path: '/sistema/evangelismo' },
-  { key: 'pessoas', label: 'Pessoas', path: '/sistema/pessoas' },
-  { key: 'mapa', label: 'Mapa', path: '/sistema/mapa' },
-  { key: 'treinamento', label: 'Treinamento', path: '/sistema/treinamento' },
-  { key: 'galeria', label: 'Galeria', path: '/sistema/galeria' },
-  { key: 'grupos', label: 'Grupos', path: '/sistema/grupos' },
-  { key: 'dashboard', label: 'Dashboard', path: '/sistema/dashboard' },
+  { key: 'voluntarios', label: 'Voluntários', path: '/sistema/voluntario', perfis: ['admin'] },
+  { key: 'usuarios', label: 'Usuários', path: '/sistema/usuarios', perfis: ['admin'] },
+  { key: 'locais', label: 'Locais', path: '/sistema/locais', perfis: ['admin', 'voluntario'] },
+  { key: 'agenda', label: 'Agenda', path: '/sistema/agenda', perfis: ['admin', 'voluntario', 'igreja', 'lider'] },
+  { key: 'evangelismo', label: 'Evangelismo', path: '/sistema/evangelismo', perfis: ['admin', 'voluntario'] },
+  { key: 'pessoas', label: 'Pessoas', path: '/sistema/pessoas', perfis: ['admin', 'voluntario'] },
+  { key: 'mapa', label: 'Mapa', path: '/sistema/mapa', perfis: ['admin', 'igreja'] },
+  { key: 'treinamento', label: 'Treinamento', path: '/sistema/treinamento', perfis: ['admin', 'voluntario'] },
+  { key: 'galeria', label: 'Galeria', path: '/sistema/galeria', perfis: ['admin', 'voluntario', 'igreja'] },
+  { key: 'grupos', label: 'Grupos', path: '/sistema/grupos', perfis: ['admin', 'voluntario'] },
+  { key: 'dashboard', label: 'Dashboard', path: '/sistema/dashboard', perfis: ['admin', 'igreja'] },
 ]
+
+function temAcesso(perfil, perfis) {
+  return perfis.includes(perfil)
+}
 
 const KANBAN_COLUNAS = [
   { key: 'sem_contato', label: 'Sem Contato', cor: '#7c3aed', bg: '#f5f3ff' },
@@ -212,7 +216,14 @@ export default function Dashboard() {
     async function carregarNome() {
       const { data } = await supabase.from('usuarios').select('nome, perfil').eq('id', user?.id).single()
       if (data?.nome) setNomeUsuario(data.nome)
-      if (data?.perfil) setPerfilUsuario(data.perfil)
+      if (data?.perfil) {
+        setPerfilUsuario(data.perfil)
+        const menuAtual = MENU.find(m => location.pathname.startsWith(m.path))
+        if (menuAtual && !temAcesso(data.perfil, menuAtual.perfis)) {
+          const primeiro = MENU.find(m => temAcesso(data.perfil, m.perfis))
+          if (primeiro) navigate(primeiro.path)
+        }
+      }
     }
     if (user?.id) carregarNome()
   }, [user])
@@ -1178,7 +1189,7 @@ export default function Dashboard() {
         {/* Sidebar */}
         <div style={s.sidebar} className="dash-sidebar">
           <p style={s.sidebarLabel}>Menu</p>
-          {MENU.map(item => (
+          {MENU.filter(item => temAcesso(perfilUsuario, item.perfis)).map(item => (
             <button
               key={item.key}
               onClick={() => navigate(item.path)}
@@ -1347,6 +1358,7 @@ export default function Dashboard() {
                           <select value={m.papel || 'membro'} onChange={async e => {
                             const novoPapel = e.target.value
                             setMembrosGrupo(prev => prev.map(x => x.usuarios?.id === m.usuarios?.id ? { ...x, papel: novoPapel } : x))
+                            if (m.usuarios?.id === user?.id) setPapelNoGrupo(novoPapel)
                             await supabase.from('usuario_grupos').update({ papel: novoPapel }).eq('grupo_id', grupoAtivo.id).eq('usuario_id', m.usuarios?.id)
                           }} style={{ ...s.inputEdit, width: 'auto', padding: '6px 10px', fontSize: '13px' }}>
                             <option value="membro">Membro</option>
@@ -4142,16 +4154,7 @@ export default function Dashboard() {
         {/* Menu extra (+ button) */}
         {menuMobileAberto && (
           <div style={{ position: 'fixed', bottom: '64px', left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 1002, boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', maxHeight: 'calc(100vh - 128px)', overflowY: 'auto' }}>
-            {[
-              { key: 'agenda', path: '/sistema/agenda', label: 'Agenda' },
-              { key: 'evangelismo', path: '/sistema/evangelismo', label: 'Evangelismo' },
-              { key: 'pessoas', path: '/sistema/pessoas', label: 'Pessoas' },
-              { key: 'mapa', path: '/sistema/mapa', label: 'Mapa' },
-              { key: 'treinamento', path: '/sistema/treinamento', label: 'Treinamento' },
-              { key: 'galeria', path: '/sistema/galeria', label: 'Galeria' },
-              { key: 'grupos', path: '/sistema/grupos', label: 'Grupos' },
-              { key: 'dashboard', path: '/sistema/dashboard', label: 'Dashboard' },
-            ].map(item => (
+            {MENU.filter(item => temAcesso(perfilUsuario, item.perfis) && !['voluntarios','usuarios','locais'].includes(item.key)).map(item => (
               <button key={item.key} onClick={() => { navigate(item.path); setMenuMobileAberto(false) }}
                 style={{ display: 'flex', alignItems: 'center', gap: '12px', background: menu === item.key ? '#fff4ec' : 'none', border: 'none', borderRadius: '10px', cursor: 'pointer', color: menu === item.key ? '#F97310' : '#374151', padding: '12px 16px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 700, textAlign: 'left' }}>
                 {item.label}
@@ -4161,23 +4164,23 @@ export default function Dashboard() {
         )}
 
         {[
-          { key: 'voluntarios', path: '/sistema/voluntario', label: 'Voluntários', icon: (
+          { key: 'voluntarios', path: '/sistema/voluntario', label: 'Voluntários', perfis: ['admin'], icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           )},
-          { key: 'usuarios', path: '/sistema/usuarios', label: 'Usuários', icon: (
+          { key: 'usuarios', path: '/sistema/usuarios', label: 'Usuários', perfis: ['admin'], icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>
             </svg>
           )},
-          { key: 'locais', path: '/sistema/locais', label: 'Locais', icon: (
+          { key: 'locais', path: '/sistema/locais', label: 'Locais', perfis: ['admin', 'voluntario'], icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
             </svg>
           )},
-        ].map(item => {
+        ].filter(item => temAcesso(perfilUsuario, item.perfis)).map(item => {
           const ativo = menu === item.key
           return (
             <button key={item.key} onClick={() => { navigate(item.path); setMenuMobileAberto(false) }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', cursor: 'pointer', color: ativo ? '#F97310' : '#9ca3af', padding: '6px 12px', fontFamily: 'inherit' }}>
