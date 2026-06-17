@@ -14,6 +14,7 @@ const MENU = [
   { key: 'pessoas', label: 'Pessoas', path: '/sistema/pessoas' },
   { key: 'mapa', label: 'Mapa', path: '/sistema/mapa' },
   { key: 'treinamento', label: 'Treinamento', path: '/sistema/treinamento' },
+  { key: 'galeria', label: 'Galeria', path: '/sistema/galeria' },
   { key: 'grupos', label: 'Grupos', path: '/sistema/grupos' },
   { key: 'dashboard', label: 'Dashboard', path: '/sistema/dashboard' },
 ]
@@ -65,7 +66,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = () => window.innerWidth < 768
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : (location.pathname === '/sistema/usuarios' || location.pathname.startsWith('/sistema/usuarios/')) ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/grupos' || location.pathname.startsWith('/sistema/grupos/') ? 'grupos' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
+  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : (location.pathname === '/sistema/usuarios' || location.pathname.startsWith('/sistema/usuarios/')) ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/grupos' || location.pathname.startsWith('/sistema/grupos/') ? 'grupos' : location.pathname === '/sistema/galeria' ? 'galeria' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
   const isNovaAbordagemPage = location.pathname === '/sistema/evangelismo/nova-abordagem'
   const pessoaIdPage = location.pathname.startsWith('/sistema/pessoas/') ? location.pathname.split('/sistema/pessoas/')[1] : null
   const usuarioIdPage = location.pathname.startsWith('/sistema/usuarios/') ? location.pathname.split('/sistema/usuarios/')[1] : null
@@ -145,6 +146,28 @@ export default function Dashboard() {
   const [modalMembrosGrupo, setModalMembrosGrupo] = useState(false)
   const [membrosGrupo, setMembrosGrupo] = useState([])
   const [confirmExcluirGrupo, setConfirmExcluirGrupo] = useState(false)
+  const [galeriaAba, setGaleriaAba] = useState('fotos')
+  const [albuns, setAlbuns] = useState([])
+  const [albumAtivo, setAlbumAtivo] = useState(null)
+  const [albumBreadcrumb, setAlbumBreadcrumb] = useState([])
+  const [fotosAlbum, setFotosAlbum] = useState([])
+  const [fotoAmpliada, setFotoAmpliada] = useState(null)
+  const [modalNovoAlbum, setModalNovoAlbum] = useState(false)
+  const [nomeNovoAlbum, setNomeNovoAlbum] = useState('')
+  const [uploadandoFoto, setUploadandoFoto] = useState(false)
+  const [uploadProgresso, setUploadProgresso] = useState({ atual: 0, total: 0 })
+  const [videos, setVideos] = useState([])
+  const [modalNovoVideo, setModalNovoVideo] = useState(false)
+  const [formNovoVideo, setFormNovoVideo] = useState({ titulo: '', link: '' })
+  const [videoGaleriaAtivo, setVideoGaleriaAtivo] = useState(null)
+  const [podeGerenciarGaleria, setPodeGerenciarGaleria] = useState(false)
+  const [confirmExcluirAlbum, setConfirmExcluirAlbum] = useState(null)
+  const [msgMenuAberto, setMsgMenuAberto] = useState(null)
+  const [msgMenuPos, setMsgMenuPos] = useState({ x: 0, y: 0 })
+  const [msgMenuIsMinha, setMsgMenuIsMinha] = useState(false)
+  const [msgHovered, setMsgHovered] = useState(null)
+  const [editandoMsg, setEditandoMsg] = useState(null)
+  const [textoEditandoMsg, setTextoEditandoMsg] = useState('')
   const [organizacoes, setOrganizacoes] = useState([])
   const [agendaDiaSelecionado, setAgendaDiaSelecionado] = useState(null) // { diaObj, evsDia }
   const [agendaDiaModal, setAgendaDiaModal] = useState(null) // modal da lista do dia
@@ -265,6 +288,7 @@ export default function Dashboard() {
     if (menu === 'evangelismo') { carregarAbordagens(); carregarEquipes(); if (user?.id) carregarOrgsUsuario(user.id) }
     if (menu === 'pessoas') { carregarPessoasKanban() }
     if (menu === 'mapa') carregarAbordagensComTotal()
+    if (menu === 'galeria') { carregarAlbuns(); carregarVideosGaleria(); verificarGrupoMidia() }
   }, [menu])
 
   useEffect(() => {
@@ -311,7 +335,7 @@ export default function Dashboard() {
       }
       const { data: msgs } = await supabase.from('mensagens_grupo').select('*, usuarios(nome)').eq('grupo_id', grupoIdPage).order('criado_em', { ascending: true })
       setMensagensGrupo(msgs || [])
-      const { data: membroData } = await supabase.from('usuario_grupos').select('papel').eq('grupo_id', grupoIdPage).eq('usuario_id', user?.id).single()
+      const { data: membroData } = await supabase.from('usuario_grupos').select('papel').eq('grupo_id', grupoIdPage).eq('usuario_id', user?.id).maybeSingle()
       setPapelNoGrupo(membroData?.papel || null)
     }
     carregarChat()
@@ -562,9 +586,110 @@ export default function Dashboard() {
       await supabase.from('usuario_grupos').delete().eq('usuario_id', uid).eq('grupo_id', id)
       setUsuarioOrgs(prev => ({ ...prev, grupos: prev.grupos.filter(x => x !== id) }))
     } else {
-      await supabase.from('usuario_grupos').insert({ usuario_id: uid, grupo_id: id })
+      await supabase.from('usuario_grupos').insert({ usuario_id: uid, grupo_id: id, papel: 'membro' })
       setUsuarioOrgs(prev => ({ ...prev, grupos: [...prev.grupos, id] }))
     }
+  }
+
+  async function carregarAlbuns(parentId = null) {
+    const query = supabase.from('albuns').select('*').order('criado_em', { ascending: false })
+    const { data } = parentId ? await query.eq('parent_id', parentId) : await query.is('parent_id', null)
+    setAlbuns(data || [])
+  }
+
+  function abrirAlbum(album, breadcrumb = []) {
+    setAlbumAtivo(album)
+    setAlbumBreadcrumb(breadcrumb)
+    carregarAlbuns(album.id)
+    carregarFotosAlbum(album.id)
+  }
+
+  function voltarAlbum() {
+    if (albumBreadcrumb.length === 0) {
+      setAlbumAtivo(null)
+      setAlbumBreadcrumb([])
+      carregarAlbuns(null)
+      setFotosAlbum([])
+    } else {
+      const pai = albumBreadcrumb[albumBreadcrumb.length - 1]
+      const novoBreadcrumb = albumBreadcrumb.slice(0, -1)
+      setAlbumAtivo(pai)
+      setAlbumBreadcrumb(novoBreadcrumb)
+      carregarAlbuns(pai.id)
+      carregarFotosAlbum(pai.id)
+    }
+  }
+
+  async function carregarVideosGaleria() {
+    const { data } = await supabase.from('videos').select('*').order('criado_em', { ascending: false })
+    setVideos(data || [])
+  }
+
+  async function verificarGrupoMidia() {
+    if (!user?.id) return
+    const { data } = await supabase.from('usuario_grupos').select('grupos(nome)').eq('usuario_id', user.id)
+    const pertence = (data || []).some(r => r.grupos?.nome?.toLowerCase().includes('mídia') || r.grupos?.nome?.toLowerCase().includes('midia'))
+    const { data: u } = await supabase.from('usuarios').select('perfil').eq('id', user.id).single()
+    setPodeGerenciarGaleria(pertence || u?.perfil === 'admin')
+  }
+
+  async function carregarFotosAlbum(albumId) {
+    const { data } = await supabase.from('fotos').select('*').eq('album_id', albumId).order('criado_em', { ascending: true })
+    setFotosAlbum(data || [])
+  }
+
+  async function criarAlbum() {
+    if (!nomeNovoAlbum.trim()) return
+    const { data } = await supabase.from('albuns').insert({ nome: nomeNovoAlbum.trim(), criado_por: user.id, parent_id: albumAtivo?.id || null }).select().single()
+    if (data) setAlbuns(prev => [data, ...prev])
+    setNomeNovoAlbum('')
+    setModalNovoAlbum(false)
+  }
+
+  async function uploadFoto(e, albumId) {
+    const files = Array.from(e.target.files)
+    if (!files.length) return
+    setUploadandoFoto(true)
+    setUploadProgresso({ atual: 0, total: files.length })
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      setUploadProgresso({ atual: i + 1, total: files.length })
+      const ext = file.name.split('.').pop()
+      const path = `${albumId}/${Date.now()}.${ext}`
+      const { error } = await supabase.storage.from('galeria').upload(path, file, { contentType: file.type })
+      if (error) { console.error('Erro upload:', error); continue }
+      if (!error) {
+        const { data: urlData } = supabase.storage.from('galeria').getPublicUrl(path)
+        await supabase.from('fotos').insert({ album_id: albumId, url: urlData.publicUrl, nome: file.name })
+      }
+    }
+    await carregarFotosAlbum(albumId)
+    setUploadandoFoto(false)
+  }
+
+  async function excluirFoto(foto) {
+    const path = foto.url.split('/galeria/')[1]
+    await supabase.storage.from('galeria').remove([path])
+    await supabase.from('fotos').delete().eq('id', foto.id)
+    setFotosAlbum(prev => prev.filter(f => f.id !== foto.id))
+  }
+
+  async function excluirAlbum(albumId) {
+    await supabase.from('albuns').delete().eq('id', albumId)
+    setAlbuns(prev => prev.filter(a => a.id !== albumId))
+  }
+
+  async function criarVideo() {
+    if (!formNovoVideo.titulo.trim() || !formNovoVideo.link.trim()) return
+    const { data } = await supabase.from('videos').insert({ titulo: formNovoVideo.titulo.trim(), link: formNovoVideo.link.trim() }).select().single()
+    if (data) setVideos(prev => [data, ...prev])
+    setFormNovoVideo({ titulo: '', link: '' })
+    setModalNovoVideo(false)
+  }
+
+  function getYoutubeId(url) {
+    const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)
+    return match ? match[1] : null
   }
 
   async function buscarVoluntariosParaVinculo(texto) {
@@ -942,6 +1067,7 @@ export default function Dashboard() {
       )}
 
       <style>{`
+        .grupo-chat-input::placeholder { color: #9ca3af !important; opacity: 1 !important; }
         @media (max-width: 768px) {
           .agenda-mobile { display: block !important; }
           .agenda-desktop { display: none !important; }
@@ -953,6 +1079,7 @@ export default function Dashboard() {
           .dash-header-title { font-size: 15px !important; }
           .dash-header-logo img { height: 24px !important; }
           .dash-main { padding: 20px 16px 90px !important; }
+          .grupo-chat-container { height: calc(100vh - 174px) !important; }
           .dash-bottomnav { display: flex !important; }
           .dash-kpi-grid { grid-template-columns: 1fr 1fr !important; }
           .dash-mid-grid { grid-template-columns: 1fr !important; }
@@ -967,7 +1094,7 @@ export default function Dashboard() {
           .kanban-mobile { display: flex !important; }
           .abordagem-pessoa-grid { grid-template-columns: 1fr !important; }
           .abordagem-pessoa-card { background: transparent !important; border: none !important; padding: 0 !important; }
-          .nova-abordagem-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; }
+          .nova-abordagem-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; top: 64px !important; }
           .nova-abordagem-inner { border-radius: 0 !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; padding: 24px 20px 100px !important; overflow-y: visible !important; }
           .nova-abordagem-voltar { display: flex !important; }
           .treinamento-layout { grid-template-columns: 1fr !important; }
@@ -978,7 +1105,7 @@ export default function Dashboard() {
           .usuarios-filtros { display: flex !important; }
           .vol-header { flex-wrap: wrap !important; gap: 10px !important; }
           .btn-novo-vol { width: 100% !important; text-align: center !important; justify-content: center !important; }
-          .usuario-modal-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; }
+          .usuario-modal-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; top: 64px !important; }
           .usuario-modal-inner { border-radius: 0 !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; padding: 24px 20px 100px !important; overflow-y: visible !important; }
           .usuario-modal-voltar { display: flex !important; }
           .usuario-modal-close { display: none !important; }
@@ -1066,7 +1193,7 @@ export default function Dashboard() {
         <div style={s.main} className="dash-main">
 
           {menu === 'grupos' && grupoIdPage && grupoAtivo && (
-            <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+            <div className="grupo-chat-container" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
               {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <button onClick={() => navigate('/sistema/grupos')} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
@@ -1111,17 +1238,44 @@ export default function Dashboard() {
               </div>
 
               {/* Mensagens */}
-              <div style={{ flex: 1, overflowY: 'auto', background: '#f9fafb', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ flex: 1, overflowY: 'auto', background: '#e8eaec', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }} onClick={() => setMsgMenuAberto(null)}>
                 {mensagensGrupo.length === 0 && <p style={{ color: '#9ca3af', fontSize: '14px', textAlign: 'center', marginTop: '40px' }}>Nenhuma mensagem ainda.</p>}
                 {mensagensGrupo.map(m => {
                   const isMinha = m.usuario_id === user?.id
                   const hora = new Date(m.criado_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
                   const data = new Date(m.criado_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                  const menuAberto = msgMenuAberto === m.id
                   return (
-                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMinha ? 'flex-end' : 'flex-start' }}>
+                    <div key={m.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMinha ? 'flex-end' : 'flex-start' }}
+                      onMouseEnter={() => setMsgHovered(m.id)} onMouseLeave={() => setMsgHovered(null)}>
                       {!isMinha && <div style={{ fontSize: '11px', fontWeight: 700, color: '#F97310', marginBottom: '3px' }}>{m.usuarios?.nome}</div>}
-                      <div style={{ background: isMinha ? '#F97310' : '#fff', color: isMinha ? '#fff' : '#0f1117', borderRadius: isMinha ? '16px 16px 4px 16px' : '16px 16px 16px 4px', padding: '10px 14px', maxWidth: '75%', fontSize: '14px', lineHeight: 1.5, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
-                        {m.mensagem}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexDirection: isMinha ? 'row-reverse' : 'row', position: 'relative' }}>
+                        {editandoMsg === m.id ? (
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <input value={textoEditandoMsg} onChange={e => setTextoEditandoMsg(e.target.value)} onKeyDown={async e => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                await supabase.from('mensagens_grupo').update({ mensagem: textoEditandoMsg }).eq('id', m.id)
+                                setMensagensGrupo(prev => prev.map(x => x.id === m.id ? { ...x, mensagem: textoEditandoMsg } : x))
+                                setEditandoMsg(null)
+                              } else if (e.key === 'Escape') { setEditandoMsg(null) }
+                            }} autoFocus style={{ padding: '8px 12px', border: '1.5px solid #F97310', borderRadius: '50px', fontSize: '14px', fontFamily: 'inherit', outline: 'none', minWidth: '180px' }} />
+                            <button onClick={async () => {
+                              await supabase.from('mensagens_grupo').update({ mensagem: textoEditandoMsg }).eq('id', m.id)
+                              setMensagensGrupo(prev => prev.map(x => x.id === m.id ? { ...x, mensagem: textoEditandoMsg } : x))
+                              setEditandoMsg(null)
+                            }} style={{ background: '#F97310', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', color: '#fff', fontSize: '16px' }}>✓</button>
+                            <button onClick={() => setEditandoMsg(null)} style={{ background: '#e5e7eb', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px' }}>✕</button>
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ background: isMinha ? '#F97310' : '#fff', color: isMinha ? '#fff' : '#0f1117', borderRadius: isMinha ? '16px 16px 4px 16px' : '16px 16px 16px 4px', padding: '10px 14px', maxWidth: '75%', fontSize: '14px', lineHeight: 1.5, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                              {m.mensagem}
+                            </div>
+                            {(msgHovered === m.id || menuAberto) && (
+                              <button onClick={e => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setMsgMenuPos({ x: r.left, y: r.top }); setMsgMenuIsMinha(isMinha); setMsgMenuAberto(menuAberto ? null : m.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '18px', padding: '2px 4px', lineHeight: 1 }}>›</button>
+                            )}
+                          </>
+                        )}
                       </div>
                       <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '3px' }}>{data} {hora}</div>
                     </div>
@@ -1132,22 +1286,31 @@ export default function Dashboard() {
 
               {/* Input */}
               {papelNoGrupo === 'admin' ? (
-                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                <div style={{ display: 'flex', marginTop: '12px', border: '1.5px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', background: '#fff' }}>
                   <input
                     value={novaMensagem}
                     onChange={e => setNovaMensagem(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && !e.shiftKey && enviarMensagem()}
                     placeholder="Digite uma mensagem..."
-                    style={{ flex: 1, padding: '12px 16px', border: '1.5px solid #e5e7eb', borderRadius: '50px', fontSize: '14px', fontFamily: 'inherit', outline: 'none', color: '#0f1117' }}
+                    className="grupo-chat-input"
+                    style={{ flex: 1, padding: '12px 16px', border: 'none', fontSize: '14px', fontFamily: 'inherit', outline: 'none', color: '#0f1117', background: 'transparent', opacity: 1 }}
                   />
-                  <button onClick={enviarMensagem} disabled={enviandoMensagem || !novaMensagem.trim()} style={{ background: '#F97310', border: 'none', borderRadius: '50%', width: '46px', height: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, opacity: (!novaMensagem.trim() || enviandoMensagem) ? 0.5 : 1 }}>
+                  <button onClick={enviarMensagem} disabled={enviandoMensagem || !novaMensagem.trim()} style={{ background: '#F97310', border: 'none', borderRadius: '0', width: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, opacity: 1 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   </button>
                 </div>
-              ) : (
-                <div style={{ marginTop: '12px', textAlign: 'center', fontSize: '13px', color: '#9ca3af', padding: '10px', background: '#f3f4f6', borderRadius: '8px' }}>
-                  Apenas administradores do grupo podem enviar mensagens.
-                </div>
+              ) : null}
+
+              {/* Menu flutuante de mensagem */}
+              {msgMenuAberto && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 999 }} onClick={() => setMsgMenuAberto(null)} />
+                  <div style={{ position: 'fixed', ...(msgMenuPos.x + 150 > window.innerWidth ? { right: window.innerWidth - msgMenuPos.x - 20 } : { left: msgMenuPos.x }), ...(msgMenuPos.y > 160 ? { top: msgMenuPos.y - 10, transform: 'translateY(-100%)' } : { top: msgMenuPos.y + 30 }), background: '#1a1d27', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', zIndex: 1000, minWidth: '140px', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+                    {msgMenuIsMinha && <button onClick={() => { const m = mensagensGrupo.find(x => x.id === msgMenuAberto); if (m) { setEditandoMsg(m.id); setTextoEditandoMsg(m.mensagem) } setMsgMenuAberto(null) }} style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#e5e7eb', cursor: 'pointer', fontFamily: 'inherit' }}>Editar</button>}
+                    <button onClick={() => { const m = mensagensGrupo.find(x => x.id === msgMenuAberto); if (m) navigator.clipboard.writeText(m.mensagem); setMsgMenuAberto(null) }} style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#e5e7eb', cursor: 'pointer', fontFamily: 'inherit' }}>Copiar</button>
+                    {msgMenuIsMinha && <button onClick={async () => { await supabase.from('mensagens_grupo').delete().eq('id', msgMenuAberto); setMensagensGrupo(prev => prev.filter(x => x.id !== msgMenuAberto)); setMsgMenuAberto(null) }} style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#f87171', cursor: 'pointer', fontFamily: 'inherit' }}>Apagar</button>}
+                  </div>
+                </>
               )}
 
               {/* Modal editar nome */}
@@ -1181,9 +1344,10 @@ export default function Dashboard() {
                       {membrosGrupo.map(m => (
                         <div key={m.usuarios?.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#f9fafb', borderRadius: '10px' }}>
                           <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117' }}>{m.usuarios?.nome}</span>
-                          <select value={m.papel} onChange={async e => {
-                            await supabase.from('usuario_grupos').update({ papel: e.target.value }).eq('grupo_id', grupoAtivo.id).eq('usuario_id', m.usuarios?.id)
-                            setMembrosGrupo(prev => prev.map(x => x.usuarios?.id === m.usuarios?.id ? { ...x, papel: e.target.value } : x))
+                          <select value={m.papel || 'membro'} onChange={async e => {
+                            const novoPapel = e.target.value
+                            setMembrosGrupo(prev => prev.map(x => x.usuarios?.id === m.usuarios?.id ? { ...x, papel: novoPapel } : x))
+                            await supabase.from('usuario_grupos').update({ papel: novoPapel }).eq('grupo_id', grupoAtivo.id).eq('usuario_id', m.usuarios?.id)
                           }} style={{ ...s.inputEdit, width: 'auto', padding: '6px 10px', fontSize: '13px' }}>
                             <option value="membro">Membro</option>
                             <option value="admin">Admin</option>
@@ -1341,6 +1505,220 @@ export default function Dashboard() {
               </div>
             )
           })()}
+
+          {menu === 'galeria' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                <h2 style={s.pageTitle}>Galeria</h2>
+                {podeGerenciarGaleria && (
+                  <button onClick={() => galeriaAba === 'fotos' ? setModalNovoAlbum(true) : setModalNovoVideo(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F97310', color: '#fff', border: 'none', borderRadius: '10px', padding: '10px 18px', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    + {galeriaAba === 'fotos' ? 'Novo Álbum' : 'Novo Vídeo'}
+                  </button>
+                )}
+              </div>
+
+              {/* Abas */}
+              <div style={{ display: 'flex', gap: '4px', background: '#f3f4f6', borderRadius: '10px', padding: '4px', marginBottom: '24px', width: 'fit-content' }}>
+                {['fotos', 'videos'].map(aba => (
+                  <button key={aba} onClick={() => { setGaleriaAba(aba); setAlbumAtivo(null); setVideoGaleriaAtivo(null) }} style={{ padding: '8px 20px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px', fontWeight: 700, background: galeriaAba === aba ? '#fff' : 'transparent', color: galeriaAba === aba ? '#F97310' : '#6b7280', boxShadow: galeriaAba === aba ? '0 1px 4px rgba(0,0,0,0.08)' : 'none' }}>
+                    {aba === 'fotos' ? 'Fotos' : 'Vídeos'}
+                  </button>
+                ))}
+              </div>
+
+              {/* ABA FOTOS */}
+              {galeriaAba === 'fotos' && (
+                <div>
+                  {/* Breadcrumb */}
+                  {albumAtivo && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                      <button onClick={() => { setAlbumAtivo(null); setAlbumBreadcrumb([]); carregarAlbuns(null); setFotosAlbum([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontWeight: 700, fontSize: '14px', padding: 0, fontFamily: 'inherit' }}>Galeria</button>
+                      {albumBreadcrumb.map((b, i) => (
+                        <span key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ color: '#9ca3af' }}>›</span>
+                          <button onClick={() => { const novo = albumBreadcrumb.slice(0, i + 1); setAlbumAtivo(b); setAlbumBreadcrumb(novo.slice(0, -1)); carregarAlbuns(b.id); carregarFotosAlbum(b.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontWeight: 700, fontSize: '14px', padding: 0, fontFamily: 'inherit' }}>{b.nome}</button>
+                        </span>
+                      ))}
+                      <span style={{ color: '#9ca3af' }}>›</span>
+                      <span style={{ fontSize: '14px', fontWeight: 800, color: '#0f1117' }}>{albumAtivo.nome}</span>
+                      {podeGerenciarGaleria && (
+                        {uploadandoFoto ? (
+                          <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', minWidth: '140px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#F97310' }}>{uploadProgresso.atual}/{uploadProgresso.total} fotos</span>
+                            <div style={{ width: '140px', height: '6px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', background: '#F97310', borderRadius: '99px', width: `${(uploadProgresso.atual / uploadProgresso.total) * 100}%`, transition: 'width 0.3s' }} />
+                            </div>
+                          </div>
+                        ) : (
+                          <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', background: '#F97310', color: '#fff', border: 'none', borderRadius: '10px', padding: '8px 16px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                            + Fotos
+                            <input type="file" accept="image/*" multiple onChange={e => uploadFoto(e, albumAtivo.id)} style={{ display: 'none' }} />
+                          </label>
+                        )}
+                      )}
+                    </div>
+                  )}
+
+                  {/* Subálbuns */}
+                  {albuns.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', marginBottom: fotosAlbum.length > 0 ? '24px' : 0 }}>
+                      {albuns.map(a => (
+                        <div key={a.id} onClick={() => abrirAlbum(a, albumAtivo ? [...albumBreadcrumb, albumAtivo] : [])} style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.08)', cursor: 'pointer', border: '1.5px solid #f3f4f6' }}>
+                          <div style={{ height: '120px', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                            {a.capa_url ? <img src={a.capa_url} alt={a.nome} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>}
+                          </div>
+                          <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f1117' }}>{a.nome}</span>
+                            {podeGerenciarGaleria && <button onClick={e => { e.stopPropagation(); setConfirmExcluirAlbum(a) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '16px', padding: '2px' }}>×</button>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Fotos do álbum atual */}
+                  {albumAtivo && fotosAlbum.length === 0 && albuns.length === 0 && <p style={s.info}>Álbum vazio.</p>}
+                  {albumAtivo && fotosAlbum.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px' }}>
+                      {fotosAlbum.map(f => (
+                        <div key={f.id} style={{ borderRadius: '8px', overflow: 'hidden' }}>
+                          <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', cursor: 'pointer' }} onClick={() => setFotoAmpliada(f)}>
+                            <img src={f.url} alt={f.nome} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                            {podeGerenciarGaleria && <button onClick={e => { e.stopPropagation(); excluirFoto(f) }} style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '24px', height: '24px', color: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>}
+                            {podeGerenciarGaleria && albumAtivo.capa_url !== f.url && <button onClick={async e => { e.stopPropagation(); await supabase.from('albuns').update({ capa_url: f.url }).eq('id', albumAtivo.id); setAlbumAtivo(a => ({ ...a, capa_url: f.url })); setAlbuns(prev => prev.map(a => a.id === albumAtivo.id ? { ...a, capa_url: f.url } : a)) }} style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '6px', padding: '3px 7px', color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 700, fontFamily: 'inherit' }}>Capa</button>}
+                            {albumAtivo.capa_url === f.url && <div style={{ position: 'absolute', bottom: '6px', left: '6px', background: '#F97310', borderRadius: '6px', padding: '3px 7px', color: '#fff', fontSize: '11px', fontWeight: 700 }}>✓ Capa</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!albumAtivo && albuns.length === 0 && <p style={s.info}>Nenhum álbum criado ainda.</p>}
+                </div>
+              )}
+
+              {/* ABA VÍDEOS */}
+              {galeriaAba === 'videos' && !videoGaleriaAtivo && (
+                <div>
+                  {videos.length === 0 && <p style={s.info}>Nenhum vídeo adicionado ainda.</p>}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
+                    {videos.map(v => {
+                      const ytId = getYoutubeId(v.link)
+                      return (
+                        <div key={v.id} onClick={() => setVideoGaleriaAtivo(v)} style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 6px rgba(0,0,0,0.08)', cursor: 'pointer', border: '1.5px solid #f3f4f6' }}>
+                          <div style={{ position: 'relative', aspectRatio: '16/9', background: '#000' }}>
+                            {ytId ? <img src={`https://img.youtube.com/vi/${ytId}/mqdefault.jpg`} alt={v.titulo} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><svg width="40" height="40" viewBox="0 0 24 24" fill="#fff"><polygon points="5,3 19,12 5,21"/></svg></div>}
+                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <div style={{ width: '36px', height: '36px', background: 'rgba(249,115,16,0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff"><polygon points="5,3 19,12 5,21"/></svg>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f1117', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.titulo}</span>
+                            {podeGerenciarGaleria && <button onClick={async e => { e.stopPropagation(); await supabase.from('videos').delete().eq('id', v.id); setVideos(prev => prev.filter(x => x.id !== v.id)) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '16px', padding: '2px', flexShrink: 0 }}>×</button>}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* PLAYER DE VÍDEO */}
+              {galeriaAba === 'videos' && videoGaleriaAtivo && (
+                <div>
+                  <button onClick={() => setVideoGaleriaAtivo(null)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit', marginBottom: '16px' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    Voltar
+                  </button>
+                  <div style={{ background: '#000', borderRadius: '12px', overflow: 'hidden', maxWidth: '780px' }}>
+                    <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0 }}>
+                      {getYoutubeId(videoGaleriaAtivo.link) ? (
+                        <iframe src={`https://www.youtube.com/embed/${getYoutubeId(videoGaleriaAtivo.link)}`} title={videoGaleriaAtivo.titulo} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+                      ) : (
+                        <video src={videoGaleriaAtivo.link} controls style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+                      )}
+                    </div>
+                    <div style={{ padding: '14px 16px' }}>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: '#fff' }}>{videoGaleriaAtivo.titulo}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal foto ampliada */}
+              {fotoAmpliada && (() => {
+                const idx = fotosAlbum.findIndex(f => f.id === fotoAmpliada.id)
+                const ir = (delta) => { const novo = fotosAlbum[idx + delta]; if (novo) setFotoAmpliada(novo) }
+                return (
+                  <div style={{ ...s.modalOverlay, background: 'rgba(0,0,0,0.9)', top: isMobile() ? '64px' : 0 }} onClick={() => setFotoAmpliada(null)}
+                    onKeyDown={e => { if (e.key === 'ArrowLeft') ir(-1); if (e.key === 'ArrowRight') ir(1); if (e.key === 'Escape') setFotoAmpliada(null) }} tabIndex={0} ref={el => el?.focus()}>
+                    <button onClick={async e => { e.stopPropagation(); const path = fotoAmpliada.url.split('/galeria/')[1]; const { data } = await supabase.storage.from('galeria').download(path); if (data) { const a = document.createElement('a'); a.href = URL.createObjectURL(data); a.download = fotoAmpliada.nome || 'foto.jpg'; a.click(); URL.revokeObjectURL(a.href) } }} style={{ position: 'fixed', top: isMobile() ? '72px' : '16px', right: '60px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </button>
+                    <button onClick={() => setFotoAmpliada(null)} style={{ position: 'fixed', top: isMobile() ? '72px' : '16px', right: '16px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', color: '#fff', fontSize: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>×</button>
+                    {!isMobile() && idx > 0 && <button onClick={e => { e.stopPropagation(); ir(-1) }} style={{ position: 'fixed', left: '16px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '44px', height: '44px', color: '#fff', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>‹</button>}
+                    {!isMobile() && idx < fotosAlbum.length - 1 && <button onClick={e => { e.stopPropagation(); ir(1) }} style={{ position: 'fixed', right: '16px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '44px', height: '44px', color: '#fff', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>›</button>}
+                    <img src={fotoAmpliada.url} alt={fotoAmpliada.nome} style={{ maxWidth: '85vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: '8px' }} onClick={e => e.stopPropagation()}
+                      onTouchStart={e => { e.stopPropagation(); e.currentTarget._tx = e.touches[0].clientX }}
+                      onTouchEnd={e => { e.stopPropagation(); const dx = e.changedTouches[0].clientX - e.currentTarget._tx; if (dx > 50) ir(-1); else if (dx < -50) ir(1) }} />
+                    <div style={{ position: 'fixed', bottom: isMobile() ? '80px' : '16px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '6px', padding: '0 16px', overflowX: 'auto' }} onClick={e => e.stopPropagation()}>
+                      {fotosAlbum.map((f, i) => (
+                        <img key={f.id} src={f.url} alt={f.nome} onClick={e => { e.stopPropagation(); setFotoAmpliada(f) }} style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', cursor: 'pointer', border: i === idx ? '2px solid #F97310' : '2px solid transparent', opacity: i === idx ? 1 : 0.6, flexShrink: 0 }} />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* Modal confirmar exclusão de álbum */}
+              {confirmExcluirAlbum && (
+                <div style={s.modalOverlay} onClick={() => setConfirmExcluirAlbum(null)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '8px' }}>Excluir álbum?</h3>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>O álbum <strong>{confirmExcluirAlbum.nome}</strong> e todo seu conteúdo será excluído permanentemente.</p>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                      <button style={s.backBtn} onClick={() => setConfirmExcluirAlbum(null)}>Cancelar</button>
+                      <button style={{ ...s.editBtn, background: '#ef4444', color: '#fff' }} onClick={() => { excluirAlbum(confirmExcluirAlbum.id); setConfirmExcluirAlbum(null) }}>Excluir</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal novo álbum */}
+              {modalNovoAlbum && (
+                <div style={s.modalOverlay} onClick={() => setModalNovoAlbum(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Novo Álbum</h3>
+                    <label style={s.fieldLabel}>Nome do álbum</label>
+                    <input style={{ ...s.inputEdit, marginBottom: '20px' }} value={nomeNovoAlbum} onChange={e => setNomeNovoAlbum(e.target.value)} autoFocus onKeyDown={e => e.key === 'Enter' && criarAlbum()} placeholder="Ex: Dia 1 - Chegada" />
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                      <button style={s.backBtn} onClick={() => setModalNovoAlbum(false)}>Cancelar</button>
+                      <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={criarAlbum}>Criar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal novo vídeo */}
+              {modalNovoVideo && (
+                <div style={s.modalOverlay} onClick={() => setModalNovoVideo(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '400px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Novo Vídeo</h3>
+                    <label style={s.fieldLabel}>Título</label>
+                    <input style={{ ...s.inputEdit, marginBottom: '14px' }} value={formNovoVideo.titulo} onChange={e => setFormNovoVideo(f => ({ ...f, titulo: e.target.value }))} placeholder="Ex: Culto de abertura" />
+                    <label style={s.fieldLabel}>Link (YouTube, Drive...)</label>
+                    <input style={{ ...s.inputEdit, marginBottom: '20px' }} value={formNovoVideo.link} onChange={e => setFormNovoVideo(f => ({ ...f, link: e.target.value }))} placeholder="https://..." />
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                      <button style={s.backBtn} onClick={() => setModalNovoVideo(false)}>Cancelar</button>
+                      <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={criarVideo}>Adicionar</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {menu === 'dashboard' && (() => {
             const base = filtro ? filtro.lista : voluntarios
@@ -3744,7 +4122,7 @@ export default function Dashboard() {
                   if (filtroUsuarioGrupo && !(u.grupos || []).includes(filtroUsuarioGrupo)) return false
                   return true
                 }).map(u => (
-                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={() => navigate(`/sistema/usuarios/${u.id}`)}>
+                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={() => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); setErroEquipeObrigatoria(false); carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos(); navigate(`/sistema/usuarios/${u.id}`) }}>
                     <div style={s.cardAvatar}>{u.nome?.[0]?.toUpperCase()}</div>
                     <div style={s.cardInfo}>
                       <div style={s.cardNome}>{(() => { const p = (u.nome || '').trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0] })()}</div>
@@ -3772,6 +4150,7 @@ export default function Dashboard() {
               { key: 'pessoas', path: '/sistema/pessoas', label: 'Pessoas' },
               { key: 'mapa', path: '/sistema/mapa', label: 'Mapa' },
               { key: 'treinamento', path: '/sistema/treinamento', label: 'Treinamento' },
+              { key: 'galeria', path: '/sistema/galeria', label: 'Galeria' },
               { key: 'grupos', path: '/sistema/grupos', label: 'Grupos' },
               { key: 'dashboard', path: '/sistema/dashboard', label: 'Dashboard' },
             ].map(item => (
@@ -3849,7 +4228,8 @@ function EquipeRadio({ itens, selecionado, onSelect, fieldLabel, erro }) {
       <input
         type="text"
         value={busca}
-        onChange={e => { setBusca(e.target.value); setAberto(e.target.value.length > 0) }}
+        onChange={e => { setBusca(e.target.value); setAberto(true) }}
+        onFocus={() => setAberto(true)}
         onBlur={() => setTimeout(() => { setAberto(false); setBusca('') }, 200)}
         placeholder={nomeSelecionado || 'Buscar equipes...'}
         autoComplete="off"
@@ -3883,7 +4263,8 @@ function EquipeGrupoCheckbox({ label, itens, marcados, onToggle, fieldLabel }) {
       <input
         type="text"
         value={busca}
-        onChange={e => { setBusca(e.target.value); setAberto(e.target.value.length > 0) }}
+        onChange={e => { setBusca(e.target.value); setAberto(true) }}
+        onFocus={() => setAberto(true)}
         onBlur={() => setTimeout(() => { setAberto(false); setBusca('') }, 200)}
         placeholder={selecionados.length ? selecionados.map(o => o.nome).join(', ') : `Buscar ${label.toLowerCase()}...`}
         autoComplete="off"

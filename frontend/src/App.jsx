@@ -27,6 +27,7 @@ export default function App() {
         <Route path="/sistema/treinamento" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/grupos" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/grupos/:grupoId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/sistema/galeria" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
