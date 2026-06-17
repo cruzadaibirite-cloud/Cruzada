@@ -353,6 +353,23 @@ export default function Dashboard() {
   }, [grupoIdPage, user])
 
   useEffect(() => {
+    if (!grupoIdPage || !user?.id) return
+    const channel = supabase.channel(`papel-grupo-${grupoIdPage}-${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'usuario_grupos',
+        filter: `grupo_id=eq.${grupoIdPage}`
+      }, payload => {
+        if (payload.new?.usuario_id === user.id) {
+          setPapelNoGrupo(payload.new.papel || null)
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [grupoIdPage, user])
+
+  useEffect(() => {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' })
   }, [mensagensGrupo])
 
