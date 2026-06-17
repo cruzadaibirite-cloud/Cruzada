@@ -1541,8 +1541,7 @@ export default function Dashboard() {
                       ))}
                       <span style={{ color: '#9ca3af' }}>›</span>
                       <span style={{ fontSize: '14px', fontWeight: 800, color: '#0f1117' }}>{albumAtivo.nome}</span>
-                      {podeGerenciarGaleria && (
-                        {uploadandoFoto ? (
+                      {podeGerenciarGaleria && (uploadandoFoto ? (
                           <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', minWidth: '140px' }}>
                             <span style={{ fontSize: '12px', fontWeight: 700, color: '#F97310' }}>{uploadProgresso.atual}/{uploadProgresso.total} fotos</span>
                             <div style={{ width: '140px', height: '6px', background: '#f3f4f6', borderRadius: '99px', overflow: 'hidden' }}>
@@ -1554,8 +1553,7 @@ export default function Dashboard() {
                             + Fotos
                             <input type="file" accept="image/*" multiple onChange={e => uploadFoto(e, albumAtivo.id)} style={{ display: 'none' }} />
                           </label>
-                        )}
-                      )}
+                        ))}
                     </div>
                   )}
 
@@ -4143,7 +4141,7 @@ export default function Dashboard() {
 
         {/* Menu extra (+ button) */}
         {menuMobileAberto && (
-          <div style={{ position: 'fixed', bottom: '64px', left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 1002, boxShadow: '0 -4px 24px rgba(0,0,0,0.08)' }}>
+          <div style={{ position: 'fixed', bottom: '64px', left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 1002, boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', maxHeight: 'calc(100vh - 128px)', overflowY: 'auto' }}>
             {[
               { key: 'agenda', path: '/sistema/agenda', label: 'Agenda' },
               { key: 'evangelismo', path: '/sistema/evangelismo', label: 'Evangelismo' },
