@@ -419,6 +419,8 @@ export default function Home() {
           nav { padding: 0 20px; }
           .nav-links, .nav-date { display: none; }
           .nav-hamburger { display: flex; }
+          .btn-nav { display: none; }
+          .nav-mobile-menu .btn-nav { display: block; width: 100%; text-align: left; padding-left: 0; background: none; }
           nav { height: 56px; }
           .nav-logo-mark { width: 28px; height: 28px; font-size: 13px; }
           .nav-logo-text { font-size: 13px; letter-spacing: 0; }
@@ -499,6 +501,7 @@ export default function Home() {
         <a href="#evangelho">Evangelho</a>
         <a href="#missao">Missão</a>
         <a href="#agenda">Agenda</a>
+        <button className="btn-nav" id="btn-entrar-mobile" style={{marginTop:8}}>Entrar</button>
       </div>
 
       <section className="hero" id="inicio">
