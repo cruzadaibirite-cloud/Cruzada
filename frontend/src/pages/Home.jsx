@@ -419,7 +419,6 @@ export default function Home() {
           nav { padding: 0 20px; }
           .nav-links, .nav-date { display: none; }
           .nav-hamburger { display: flex; }
-          .btn-nav { display: none; }
           nav { height: 56px; }
           .nav-logo-mark { width: 28px; height: 28px; font-size: 13px; }
           .nav-logo-text { font-size: 13px; letter-spacing: 0; }
