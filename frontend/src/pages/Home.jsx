@@ -101,7 +101,7 @@ export default function Home() {
     })
 
     // Botão Entrar → /login
-    const btnsEntrar = document.querySelectorAll('.btn-nav, #btn-entrar-mobile')
+    const btnsEntrar = document.querySelectorAll('.btn-nav')
     const onEntrar = e => { e.preventDefault(); navigate('/login') }
     btnsEntrar.forEach(btn => btn.addEventListener('click', onEntrar))
 
@@ -146,8 +146,8 @@ export default function Home() {
         .nav-links a:hover, .nav-links a.active { color: var(--orange); border-bottom-color: var(--orange); }
         .nav-right { display: flex; align-items: center; gap: 20px; }
         .nav-date { font-size: 12px; color: var(--orange); font-weight: 700; letter-spacing: 1px; }
-        .btn-nav { background: var(--orange); color: #fff; padding: 11px 28px; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; text-decoration: none; transition: all .2s; white-space: nowrap; border-radius: 50px; cursor: pointer; border: none; font-family: inherit; }
-        .btn-nav:hover { background: var(--orange2); box-shadow: 0 0 24px rgba(249,115,22,.5); }
+        .btn-nav { background: transparent; color: var(--orange); padding: 11px 28px; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; text-decoration: none; transition: all .2s; white-space: nowrap; border-radius: 50px; cursor: pointer; border: none; font-family: inherit; }
+        .btn-nav:hover { color: var(--orange2); }
         .hero { background: var(--dark); min-height: 100dvh; position: relative; overflow: hidden; display: flex; align-items: center; padding-top: 75px; }
         .hero-map { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 30% 50%, rgba(249,115,22,.06) 0%, transparent 60%), url('/f1.jpg') center/cover no-repeat; filter: brightness(.12) saturate(.2); }
         .hero-inner { position: relative; z-index: 2; width: 100%; max-width: 1280px; margin: 0 auto; padding: 80px 72px; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 60px; }
@@ -500,7 +500,6 @@ export default function Home() {
         <a href="#evangelho">Evangelho</a>
         <a href="#missao">Missão</a>
         <a href="#agenda">Agenda</a>
-        <a href="#" id="btn-entrar-mobile" style={{color:'var(--orange)',fontWeight:800,borderBottom:'none',marginTop:8}}>Entrar</a>
       </div>
 
       <section className="hero" id="inicio">

@@ -243,6 +243,11 @@ export default function Dashboard() {
     return () => { document.body.style.overflow = '' }
   }, [modalEvento])
 
+  useEffect(() => {
+    setMenuMobileAberto(false)
+    setDropdownOpen(false)
+  }, [location.pathname])
+
   const [pessoasKanban, setPessoasKanban] = useState([])
   const [loadingPessoas, setLoadingPessoas] = useState(false)
   const [dragPessoa, setDragPessoa] = useState(null)
@@ -4170,14 +4175,17 @@ export default function Dashboard() {
 
         {/* Menu extra (+ button) */}
         {menuMobileAberto && (
-          <div style={{ position: 'fixed', bottom: '64px', left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 1002, boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', maxHeight: 'calc(100vh - 128px)', overflowY: 'auto' }}>
+          <>
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1001 }} onClick={() => setMenuMobileAberto(false)} />
+            <div style={{ position: 'fixed', bottom: '64px', left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 1002, boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', maxHeight: 'calc(100vh - 128px)', overflowY: 'auto' }}>
             {MENU.filter(item => temAcesso(perfilUsuario, item.perfis) && !['voluntarios','usuarios','locais'].includes(item.key)).map(item => (
               <button key={item.key} onClick={() => { navigate(item.path); setMenuMobileAberto(false) }}
                 style={{ display: 'flex', alignItems: 'center', gap: '12px', background: menu === item.key ? '#fff4ec' : 'none', border: 'none', borderRadius: '10px', cursor: 'pointer', color: menu === item.key ? '#F97310' : '#374151', padding: '12px 16px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 700, textAlign: 'left' }}>
                 {item.label}
               </button>
             ))}
-          </div>
+            </div>
+          </>
         )}
 
         {[
