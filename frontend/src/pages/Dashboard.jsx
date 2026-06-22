@@ -1240,6 +1240,7 @@ export default function Dashboard() {
                   <div style={{ fontSize: '16px', fontWeight: 800, color: '#0f1117' }}>{grupoAtivo.nome}</div>
                   {papelNoGrupo && <div style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 600 }}>{papelNoGrupo === 'admin' ? 'Administrador' : 'Membro'}</div>}
                 </div>
+                {(perfilUsuario === 'admin' || papelNoGrupo === 'admin') && (
                 <div style={{ position: 'relative' }}>
                   <button onClick={() => setMenuGrupoAberto(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0f1117', padding: '4px 8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
@@ -1268,6 +1269,7 @@ export default function Dashboard() {
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
               {/* Mensagens */}
@@ -4154,7 +4156,7 @@ export default function Dashboard() {
                   if (filtroUsuarioGrupo && !(u.grupos || []).includes(filtroUsuarioGrupo)) return false
                   return true
                 }).map(u => (
-                  <div key={u.id} style={{ ...s.card, cursor: 'pointer' }} onClick={() => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); setErroEquipeObrigatoria(false); carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos(); navigate(`/sistema/usuarios/${u.id}`) }}>
+                  <div key={u.id} style={{ ...s.card, cursor: 'pointer', ...(!u.ativo ? { borderLeft: '4px solid #F97310' } : {}) }} onClick={() => { setSelectedUsuario(u); setConfirmDeleteUsuario(false); setBuscaVoluntario(''); setSugestoesVoluntario([]); setFormEditUsuario({ perfil: u.perfil || '' }); setErroEquipeObrigatoria(false); carregarOrgsUsuario(u.id); carregarEquipes(); carregarGrupos(); navigate(`/sistema/usuarios/${u.id}`) }}>
                     <div style={s.cardAvatar}>{u.nome?.[0]?.toUpperCase()}</div>
                     <div style={s.cardInfo}>
                       <div style={s.cardNome}>{(() => { const p = (u.nome || '').trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0] })()}</div>
@@ -4318,12 +4320,12 @@ function EquipeGrupoCheckbox({ label, itens, marcados, onToggle, fieldLabel }) {
 function VoluntarioCard({ v, onClick }) {
   const pendente = camposFaltando(v).length > 0
   return (
-    <div style={{ ...s.card, ...(pendente ? { borderLeft: '4px solid #0f1117' } : {}) }} onClick={onClick}>
+    <div style={{ ...s.card, ...(pendente ? { borderLeft: '4px solid #F97310' } : {}) }} onClick={onClick}>
       <div style={s.cardAvatar}>{v.nome_completo?.[0]?.toUpperCase()}</div>
       <div style={s.cardInfo}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={s.cardNome}>{(() => { const p = (v.nome_completo || '').trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0] })()}</span>
-          {pendente && <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f1117', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '4px', padding: '1px 6px' }}>incompleto</span>}
+          {pendente && <span style={{ fontSize: '11px', fontWeight: 700, color: '#F97310', background: '#fff4ec', border: '1px solid #fed7aa', borderRadius: '4px', padding: '1px 6px' }}>incompleto</span>}
         </div>
         <div style={s.cardSub}>{v.cidade_estado_pais}</div>
         <div style={s.cardSub}>{v.idade} anos</div>
