@@ -17,7 +17,10 @@ const MENU = [
   { key: 'galeria', label: 'Galeria', path: '/sistema/galeria', perfis: ['admin', 'voluntario', 'igreja'] },
   { key: 'grupos', label: 'Grupos', path: '/sistema/grupos', perfis: ['admin', 'voluntario'] },
   { key: 'dashboard', label: 'Dashboard', path: '/sistema/dashboard', perfis: ['admin', 'igreja'] },
+  { key: 'controle', label: 'Controle', path: '/sistema/controle', perfis: ['admin'] },
 ]
+
+const PERFIS_CONTROLE = ['admin', 'voluntario', 'igreja', 'lider']
 
 function temAcesso(perfil, perfis) {
   return perfis.includes(perfil)
@@ -70,7 +73,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = () => window.innerWidth < 768
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : (location.pathname === '/sistema/usuarios' || location.pathname.startsWith('/sistema/usuarios/')) ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/grupos' || location.pathname.startsWith('/sistema/grupos/') ? 'grupos' : location.pathname === '/sistema/galeria' ? 'galeria' : location.pathname === '/sistema/dashboard' ? 'dashboard' : 'voluntarios'
+  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : (location.pathname === '/sistema/usuarios' || location.pathname.startsWith('/sistema/usuarios/')) ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/grupos' || location.pathname.startsWith('/sistema/grupos/') ? 'grupos' : location.pathname === '/sistema/galeria' ? 'galeria' : location.pathname === '/sistema/dashboard' ? 'dashboard' : location.pathname === '/sistema/controle' ? 'controle' : 'voluntarios'
   const isNovaAbordagemPage = location.pathname === '/sistema/evangelismo/nova-abordagem'
   const pessoaIdPage = location.pathname.startsWith('/sistema/pessoas/') ? location.pathname.split('/sistema/pessoas/')[1] : null
   const usuarioIdPage = location.pathname.startsWith('/sistema/usuarios/') ? location.pathname.split('/sistema/usuarios/')[1] : null
@@ -88,6 +91,10 @@ export default function Dashboard() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [perfilUsuario, setPerfilUsuario] = useState('')
+  const [permissoes, setPermissoes] = useState(null)
+  const [permissoesOriginais, setPermissoesOriginais] = useState(null)
+  const [salvandoPermissoes, setSalvandoPermissoes] = useState(false)
+  const [minhaEquipe, setMinhaEquipe] = useState(null)
   const [editandoStatus, setEditandoStatus] = useState(false)
   const [alertaCampos, setAlertaCampos] = useState(null)
   const [editando, setEditando] = useState(false)
@@ -212,21 +219,62 @@ export default function Dashboard() {
   const [formEditAbordagem, setFormEditAbordagem] = useState({})
   const [salvandoEditAbordagem, setSalvandoEditAbordagem] = useState(false)
 
+  function acessoLiberado(perfil, itemKey, permissoesLista) {
+    const item = MENU.find(m => m.key === itemKey)
+    if (!item) return false
+    if (item.key === 'controle') return perfil === 'admin'
+    if (!permissoesLista) return temAcesso(perfil, item.perfis)
+    const row = permissoesLista.find(p => p.pagina === itemKey && p.perfil === perfil)
+    return row ? row.liberado : temAcesso(perfil, item.perfis)
+  }
+
+  function temAcessoDinamico(perfil, itemKey) {
+    return acessoLiberado(perfil, itemKey, permissoes)
+  }
+
   useEffect(() => {
     async function carregarNome() {
       const { data } = await supabase.from('usuarios').select('nome, perfil').eq('id', user?.id).single()
+      const { data: permData } = await supabase.from('permissoes').select('*')
+      setPermissoes(permData || [])
+      setPermissoesOriginais(permData || [])
+      const { data: minhaEquipeData } = await supabase.from('usuario_equipes').select('equipes(nome, cor)').eq('usuario_id', user?.id).limit(1)
+      setMinhaEquipe(minhaEquipeData?.[0]?.equipes || null)
       if (data?.nome) setNomeUsuario(data.nome)
       if (data?.perfil) {
         setPerfilUsuario(data.perfil)
         const menuAtual = MENU.find(m => location.pathname.startsWith(m.path))
-        if (menuAtual && !temAcesso(data.perfil, menuAtual.perfis)) {
-          const primeiro = MENU.find(m => temAcesso(data.perfil, m.perfis))
+        if (menuAtual && !acessoLiberado(data.perfil, menuAtual.key, permData || [])) {
+          const primeiro = MENU.find(m => acessoLiberado(data.perfil, m.key, permData || []))
           if (primeiro) navigate(primeiro.path)
         }
       }
     }
     if (user?.id) carregarNome()
   }, [user])
+
+  function alterarPermissao(pagina, perfil, liberado) {
+    setPermissoes(prev => {
+      const existe = prev.some(p => p.pagina === pagina && p.perfil === perfil)
+      return existe ? prev.map(p => p.pagina === pagina && p.perfil === perfil ? { ...p, liberado } : p) : [...prev, { pagina, perfil, liberado }]
+    })
+  }
+
+  function permissoesAlteradas() {
+    if (!permissoes || !permissoesOriginais) return false
+    return JSON.stringify(permissoes) !== JSON.stringify(permissoesOriginais)
+  }
+
+  async function salvarPermissoes() {
+    setSalvandoPermissoes(true)
+    await Promise.all(permissoes.map(p => supabase.from('permissoes').upsert({ pagina: p.pagina, perfil: p.perfil, liberado: p.liberado }, { onConflict: 'pagina,perfil' })))
+    setPermissoesOriginais(permissoes)
+    setSalvandoPermissoes(false)
+  }
+
+  function cancelarPermissoes() {
+    setPermissoes(permissoesOriginais)
+  }
 
   function getInitials(nome) {
     if (!nome) return '?'
@@ -473,7 +521,11 @@ export default function Dashboard() {
   }
 
   async function handleSignOut() {
-    await signOut()
+    try {
+      await signOut()
+    } catch (e) {
+      console.error(e)
+    }
     navigate('/login')
   }
 
@@ -745,6 +797,11 @@ export default function Dashboard() {
       return
     }
     setErroEquipeObrigatoria(false)
+    if (novoAtivo && formEditUsuario.equipe_id && !usuarioOrgs.equipes.includes(formEditUsuario.equipe_id)) {
+      await supabase.from('usuario_equipes').delete().eq('usuario_id', u.id)
+      await supabase.from('usuario_equipes').upsert({ usuario_id: u.id, equipe_id: formEditUsuario.equipe_id })
+      setUsuarioOrgs(prev => ({ ...prev, equipes: [formEditUsuario.equipe_id] }))
+    }
     await supabase.from('usuarios').update({ ativo: novoAtivo }).eq('id', u.id)
     setSelectedUsuario(v => ({ ...v, ativo: novoAtivo }))
     setUsuarios(list => list.map(x => x.id === u.id ? { ...x, ativo: novoAtivo } : x))
@@ -1198,6 +1255,15 @@ export default function Dashboard() {
           </button>
           {dropdownOpen && (
             <div style={s.dropdown}>
+              {minhaEquipe && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: minhaEquipe.cor || '#9ca3af', border: '1px solid #e5e7eb', flexShrink: 0 }} />
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{minhaEquipe.nome}</span>
+                  </div>
+                  <div style={s.dropdownDivider} />
+                </>
+              )}
               <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false) }}>Editar usuário</button>
               <div style={s.dropdownDivider} />
               <button style={{ ...s.dropdownItem, color: '#0f1117' }} onClick={handleSignOut}>Sair</button>
@@ -1211,7 +1277,7 @@ export default function Dashboard() {
         {/* Sidebar */}
         <div style={s.sidebar} className="dash-sidebar">
           <p style={s.sidebarLabel}>Menu</p>
-          {MENU.filter(item => temAcesso(perfilUsuario, item.perfis)).map(item => (
+          {MENU.filter(item => temAcessoDinamico(perfilUsuario, item.key)).map(item => (
             <button
               key={item.key}
               onClick={() => navigate(item.path)}
@@ -1424,7 +1490,9 @@ export default function Dashboard() {
             <div>
               <div className="vol-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <h2 style={{ ...s.pageTitle, margin: 0 }}>Grupos</h2>
-                <button className="btn-novo-vol" onClick={() => setModalNovoGrupo(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff' }}>+ Novo Grupo</button>
+                {perfilUsuario === 'admin' && (
+                  <button className="btn-novo-vol" onClick={() => setModalNovoGrupo(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff' }}>+ Novo Grupo</button>
+                )}
               </div>
               {(() => {
                 const descricoes = {
@@ -2023,6 +2091,51 @@ export default function Dashboard() {
             )
           })()}
 
+          {menu === 'controle' && (
+            <div style={{ padding: '24px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 900, color: '#0f1117', marginBottom: '16px' }}>Controle de Acesso</h2>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>Marque quais perfis podem acessar cada página do sistema.</p>
+              <div style={{ overflow: 'auto', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', maxHeight: '70vh' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ background: '#f9fafb' }}>
+                      <th style={{ position: 'sticky', top: 0, left: 0, zIndex: 3, textAlign: 'left', padding: '12px 16px', fontWeight: 800, color: '#0f1117', borderBottom: '1px solid #e5e7eb', background: '#f9fafb' }}>Página</th>
+                      {PERFIS_CONTROLE.map(perfil => (
+                        <th key={perfil} style={{ position: 'sticky', top: 0, zIndex: 2, textAlign: 'center', padding: '12px 16px', fontWeight: 800, color: '#0f1117', borderBottom: '1px solid #e5e7eb', textTransform: 'capitalize', background: '#f9fafb' }}>{perfil}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {MENU.filter(item => item.key !== 'controle').map(item => (
+                      <tr key={item.key}>
+                        <td style={{ position: 'sticky', left: 0, zIndex: 1, padding: '12px 16px', fontWeight: 700, color: '#374151', borderBottom: '1px solid #f3f4f6', background: '#fff' }}>{item.label}</td>
+                        {PERFIS_CONTROLE.map(perfil => {
+                          const liberado = acessoLiberado(perfil, item.key, permissoes)
+                          const isAdmin = perfil === 'admin'
+                          return (
+                            <td key={perfil} style={{ textAlign: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
+                              <input
+                                type="checkbox"
+                                checked={liberado}
+                                disabled={isAdmin}
+                                onChange={e => alterarPermissao(item.key, perfil, e.target.checked)}
+                                style={{ width: '18px', height: '18px', cursor: isAdmin ? 'not-allowed' : 'pointer', accentColor: '#F97310' }}
+                              />
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                <button onClick={cancelarPermissoes} disabled={!permissoesAlteradas() || salvandoPermissoes} style={{ padding: '10px 24px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: !permissoesAlteradas() || salvandoPermissoes ? 'not-allowed' : 'pointer', opacity: !permissoesAlteradas() || salvandoPermissoes ? 0.5 : 1, fontFamily: 'inherit' }}>Cancelar</button>
+                <button onClick={salvarPermissoes} disabled={!permissoesAlteradas() || salvandoPermissoes} style={{ padding: '10px 24px', borderRadius: '10px', border: 'none', background: '#F97310', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: !permissoesAlteradas() || salvandoPermissoes ? 'not-allowed' : 'pointer', opacity: !permissoesAlteradas() || salvandoPermissoes ? 0.5 : 1, fontFamily: 'inherit' }}>{salvandoPermissoes ? 'Salvando...' : 'Salvar'}</button>
+              </div>
+            </div>
+          )}
+
           {menu === 'voluntarios' && !selected && !novoVoluntario && (
             <>
               <div className="vol-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -2516,7 +2629,7 @@ export default function Dashboard() {
                         })
                         return (
                           <div key={di} style={{ flex: 1, borderLeft: '1px solid #f3f4f6', position: 'relative', height: `${totalH}px` }}
-                            onClick={() => abrirNovoEvento(new Date(d.getFullYear(), d.getMonth(), d.getDate()))}>
+                            onClick={() => perfilUsuario === 'admin' && abrirNovoEvento(new Date(d.getFullYear(), d.getMonth(), d.getDate()))}>
                             {/* Linhas de hora */}
                             {horas.map(h => (
                               <div key={h} style={{ position: 'absolute', top: `${h * HORA_H}px`, left: 0, right: 0, height: `${HORA_H}px`, borderBottom: '1px solid #f3f4f6' }} />
@@ -2585,7 +2698,7 @@ export default function Dashboard() {
                       </div>
                       {/* Coluna do dia */}
                       <div style={{ flex: 1, borderLeft: '1px solid #f3f4f6', position: 'relative', height: `${totalH}px`, cursor: 'pointer' }}
-                        onClick={() => abrirNovoEvento(new Date(agendaData.getFullYear(), agendaData.getMonth(), agendaData.getDate()))}>
+                        onClick={() => perfilUsuario === 'admin' && abrirNovoEvento(new Date(agendaData.getFullYear(), agendaData.getMonth(), agendaData.getDate()))}>
                         {horas.map(h => (
                           <div key={h} style={{ position: 'absolute', top: `${h * HORA_H}px`, left: 0, right: 0, height: `${HORA_H}px`, borderBottom: '1px solid #f3f4f6' }} />
                         ))}
@@ -3117,7 +3230,9 @@ export default function Dashboard() {
                   value={buscaLocal}
                   onChange={e => setBuscaLocal(e.target.value)}
                 />
-                <button onClick={() => setModalNovoLocal(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff', border: 'none', flexShrink: 0 }}>+ Novo local</button>
+                {perfilUsuario === 'admin' && (
+                  <button onClick={() => setModalNovoLocal(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff', border: 'none', flexShrink: 0 }}>+ Novo local</button>
+                )}
               </div>
 
               {buscaLocal.length > 0 && buscaLocal !== localSelecionado?.nome && (
@@ -4180,7 +4295,7 @@ export default function Dashboard() {
           <>
             <div style={{ position: 'fixed', inset: 0, zIndex: 1001 }} onClick={() => setMenuMobileAberto(false)} />
             <div style={{ position: 'fixed', bottom: '64px', left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 1002, boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', maxHeight: 'calc(100vh - 128px)', overflowY: 'auto' }}>
-            {MENU.filter(item => temAcesso(perfilUsuario, item.perfis) && !['voluntarios','usuarios','locais'].includes(item.key)).map(item => (
+            {MENU.filter(item => temAcessoDinamico(perfilUsuario, item.key) && !['voluntarios','usuarios','locais'].includes(item.key)).map(item => (
               <button key={item.key} onClick={() => { navigate(item.path); setMenuMobileAberto(false) }}
                 style={{ display: 'flex', alignItems: 'center', gap: '12px', background: menu === item.key ? '#fff4ec' : 'none', border: 'none', borderRadius: '10px', cursor: 'pointer', color: menu === item.key ? '#F97310' : '#374151', padding: '12px 16px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 700, textAlign: 'left' }}>
                 {item.label}
@@ -4207,7 +4322,7 @@ export default function Dashboard() {
               <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
             </svg>
           )},
-        ].filter(item => temAcesso(perfilUsuario, item.perfis)).map(item => {
+        ].filter(item => temAcessoDinamico(perfilUsuario, item.key)).map(item => {
           const ativo = menu === item.key
           return (
             <button key={item.key} onClick={() => { navigate(item.path); setMenuMobileAberto(false) }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', cursor: 'pointer', color: ativo ? '#F97310' : '#9ca3af', padding: '6px 12px', fontFamily: 'inherit' }}>
@@ -4233,6 +4348,15 @@ export default function Dashboard() {
           </button>
           {dropdownOpen && (
             <div style={{ ...s.dropdown, bottom: '64px', top: 'auto', right: 0 }}>
+              {minhaEquipe && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px' }}>
+                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: minhaEquipe.cor || '#9ca3af', border: '1px solid #e5e7eb', flexShrink: 0 }} />
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{minhaEquipe.nome}</span>
+                  </div>
+                  <div style={s.dropdownDivider} />
+                </>
+              )}
               <button style={s.dropdownItem} onClick={() => setDropdownOpen(false)}>Editar usuário</button>
               <div style={s.dropdownDivider} />
               <button style={{ ...s.dropdownItem, color: '#0f1117' }} onClick={handleSignOut}>Sair</button>
