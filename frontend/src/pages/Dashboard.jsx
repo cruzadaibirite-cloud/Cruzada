@@ -90,6 +90,9 @@ export default function Dashboard() {
   const [filtrosExpandidos, setFiltrosExpandidos] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [nomeUsuario, setNomeUsuario] = useState('')
+  const [fotoUsuario, setFotoUsuario] = useState('')
+  const [modalEditarPerfilAberto, setModalEditarPerfilAberto] = useState(false)
+  const [enviandoFotoPerfil, setEnviandoFotoPerfil] = useState(false)
   const [perfilUsuario, setPerfilUsuario] = useState('')
   const [permissoes, setPermissoes] = useState(null)
   const [permissoesOriginais, setPermissoesOriginais] = useState(null)
@@ -234,13 +237,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function carregarNome() {
-      const { data } = await supabase.from('usuarios').select('nome, perfil').eq('id', user?.id).single()
+      const { data } = await supabase.from('usuarios').select('nome, perfil, foto_url').eq('id', user?.id).single()
       const { data: permData } = await supabase.from('permissoes').select('*')
       setPermissoes(permData || [])
       setPermissoesOriginais(permData || [])
       const { data: minhaEquipeData } = await supabase.from('usuario_equipes').select('equipes(nome, cor)').eq('usuario_id', user?.id).limit(1)
       setMinhaEquipe(minhaEquipeData?.[0]?.equipes || null)
       if (data?.nome) setNomeUsuario(data.nome)
+      setFotoUsuario(data?.foto_url || '')
       if (data?.perfil) {
         setPerfilUsuario(data.perfil)
         const menuAtual = MENU.find(m => location.pathname.startsWith(m.path))
@@ -527,6 +531,23 @@ export default function Dashboard() {
       console.error(e)
     }
     navigate('/login')
+  }
+
+  async function handleSelecionarFotoPerfil(e) {
+    const arquivo = e.target.files?.[0]
+    e.target.value = ''
+    if (!arquivo || !user?.id) return
+    setEnviandoFotoPerfil(true)
+    const extensao = arquivo.name.split('.').pop()
+    const caminho = `${user.id}/${Date.now()}.${extensao}`
+    const { error: erroUpload } = await supabase.storage.from('fotos-perfil').upload(caminho, arquivo, { upsert: true })
+    if (!erroUpload) {
+      const { data: urlData } = supabase.storage.from('fotos-perfil').getPublicUrl(caminho)
+      const novaFotoUrl = urlData.publicUrl
+      await supabase.from('usuarios').update({ foto_url: novaFotoUrl }).eq('id', user.id)
+      setFotoUsuario(novaFotoUrl)
+    }
+    setEnviandoFotoPerfil(false)
   }
 
   function iniciarEdicao() {
@@ -1249,7 +1270,7 @@ export default function Dashboard() {
         </div>
         <div style={{ position: 'relative' }} className="dash-profile-btn">
           <button style={s.profileBtn} onClick={() => setDropdownOpen(o => !o)}>
-            <div style={s.profileAvatar}>{getInitials(nomeUsuario || user?.email)}</div>
+            <div style={s.profileAvatar}>{fotoUsuario ? <img src={fotoUsuario} alt="Foto de perfil" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : getInitials(nomeUsuario || user?.email)}</div>
             <span style={s.profileEmail} className="dash-profile-email">{nomeUsuario || user?.email}</span>
             <span style={s.profileChevron} className="dash-profile-chevron">▾</span>
           </button>
@@ -1264,7 +1285,7 @@ export default function Dashboard() {
                   <div style={s.dropdownDivider} />
                 </>
               )}
-              <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false) }}>Editar usuário</button>
+              <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false); setModalEditarPerfilAberto(true) }}>Editar perfil</button>
               <div style={s.dropdownDivider} />
               <button style={{ ...s.dropdownItem, color: '#0f1117' }} onClick={handleSignOut}>Sair</button>
             </div>
@@ -4343,7 +4364,7 @@ export default function Dashboard() {
         {/* Perfil */}
         <div style={{ position: 'relative' }}>
           <button onClick={() => setDropdownOpen(o => !o)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 12px', fontFamily: 'inherit' }}>
-            <div style={{ ...s.profileAvatar, width: '28px', height: '28px', fontSize: '11px' }}>{getInitials(nomeUsuario || user?.email)}</div>
+            <div style={{ ...s.profileAvatar, width: '28px', height: '28px', fontSize: '11px' }}>{fotoUsuario ? <img src={fotoUsuario} alt="Foto de perfil" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : getInitials(nomeUsuario || user?.email)}</div>
             <span style={{ fontSize: '10px', fontWeight: 700, color: '#9ca3af' }}>Perfil</span>
           </button>
           {dropdownOpen && (
@@ -4357,13 +4378,31 @@ export default function Dashboard() {
                   <div style={s.dropdownDivider} />
                 </>
               )}
-              <button style={s.dropdownItem} onClick={() => setDropdownOpen(false)}>Editar usuário</button>
+              <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false); setModalEditarPerfilAberto(true) }}>Editar perfil</button>
               <div style={s.dropdownDivider} />
               <button style={{ ...s.dropdownItem, color: '#0f1117' }} onClick={handleSignOut}>Sair</button>
             </div>
           )}
         </div>
       </div>
+
+      {modalEditarPerfilAberto && (
+        <div style={s.modalOverlay} onClick={() => setModalEditarPerfilAberto(false)}>
+          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '360px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Editar perfil</h3>
+            <div style={{ width: '96px', height: '96px', borderRadius: '50%', margin: '0 auto 18px', overflow: 'hidden', background: '#F97310', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 800, color: '#fff' }}>
+              {fotoUsuario ? <img src={fotoUsuario} alt="Foto de perfil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(nomeUsuario || user?.email)}
+            </div>
+            <label style={{ ...s.editBtn, background: '#F97310', color: '#fff', display: 'inline-block', cursor: enviandoFotoPerfil ? 'default' : 'pointer', opacity: enviandoFotoPerfil ? 0.6 : 1 }}>
+              {enviandoFotoPerfil ? 'Enviando...' : 'Trocar foto'}
+              <input type="file" accept="image/*" onChange={handleSelecionarFotoPerfil} disabled={enviandoFotoPerfil} style={{ display: 'none' }} />
+            </label>
+            <div style={{ marginTop: '20px' }}>
+              <button style={s.backBtn} onClick={() => setModalEditarPerfilAberto(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
@@ -4552,6 +4591,7 @@ const s = {
     justifyContent: 'center',
     fontSize: '13px',
     fontWeight: 900,
+    overflow: 'hidden',
     flexShrink: 0,
   },
   profileEmail: {
