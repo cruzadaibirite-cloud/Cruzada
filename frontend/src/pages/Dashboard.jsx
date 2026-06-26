@@ -3049,15 +3049,13 @@ export default function Dashboard() {
               {/* Barra de ações */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 {editando ? (
-                  <>
-                    <button style={{ ...s.backBtn, color: '#ef4444', borderColor: '#ef4444' }} onClick={() => setConfirmExcluirVoluntario(true)}>Excluir</button>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button style={s.backBtn} onClick={cancelarEdicao}>Cancelar</button>
-                      <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarEdicao} disabled={salvando}>
-                        {salvando ? 'Salvando...' : 'Salvar'}
-                      </button>
-                    </div>
-                  </>
+                  <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                    <button style={{ flex: 1, padding: '10px 16px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }} onClick={() => setConfirmExcluirVoluntario(true)}>Excluir</button>
+                    <button style={{ flex: 1, ...s.backBtn }} onClick={cancelarEdicao}>Cancelar</button>
+                    <button style={{ flex: 1, ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarEdicao} disabled={salvando}>
+                      {salvando ? 'Salvando...' : 'Salvar'}
+                    </button>
+                  </div>
                 ) : (
                   <>
                     <button onClick={() => { setSelected(null); setEditandoStatus(false); setAlertaCampos(null) }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
@@ -4505,7 +4503,8 @@ export default function Dashboard() {
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <button onClick={() => setConfirmExcluirVoluntario(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
                       <button onClick={async () => {
-                        await supabase.from('voluntarios').delete().eq('id', selected.id)
+                        const { error } = await supabase.from('voluntarios').delete().eq('id', selected.id)
+                        if (error) { alert('Erro ao excluir: ' + error.message); return }
                         setVoluntarios(list => list.filter(v => v.id !== selected.id))
                         setSelected(null)
                         setConfirmExcluirVoluntario(false)
