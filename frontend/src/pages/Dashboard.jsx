@@ -3498,15 +3498,13 @@ export default function Dashboard() {
                               <label style={s.fieldLabel}>Data</label>
                               <input type="date" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.data} onChange={e => setFormEvento(f => ({ ...f, data: e.target.value }))} />
                             </div>
-                            <div style={{ display: 'flex', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
-                              <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                                <label style={s.fieldLabel}>Início</label>
-                                <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.horaInicio} onChange={e => setFormEvento(f => ({ ...f, horaInicio: e.target.value }))} />
-                              </div>
-                              <div style={{ flex: '1 1 0', minWidth: 0 }}>
-                                <label style={s.fieldLabel}>Fim</label>
-                                <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.horaFim} onChange={e => setFormEvento(f => ({ ...f, horaFim: e.target.value }))} />
-                              </div>
+                            <div>
+                              <label style={s.fieldLabel}>Início</label>
+                              <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.horaInicio} onChange={e => setFormEvento(f => ({ ...f, horaInicio: e.target.value }))} />
+                            </div>
+                            <div>
+                              <label style={s.fieldLabel}>Fim</label>
+                              <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.horaFim} onChange={e => setFormEvento(f => ({ ...f, horaFim: e.target.value }))} />
                             </div>
                             {/* Local */}
                             <div style={{ position: 'relative' }}>
