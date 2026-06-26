@@ -3049,22 +3049,22 @@ export default function Dashboard() {
               {/* Barra de ações */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 {editando ? (
-                  <div style={{ display: 'flex', gap: '10px', marginLeft: 'auto' }}>
-                    <button style={s.backBtn} onClick={cancelarEdicao}>Cancelar</button>
-                    <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarEdicao} disabled={salvando}>
-                      {salvando ? 'Salvando...' : 'Salvar'}
-                    </button>
-                  </div>
+                  <>
+                    <button style={{ ...s.backBtn, color: '#ef4444', borderColor: '#ef4444' }} onClick={() => setConfirmExcluirVoluntario(true)}>Excluir</button>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button style={s.backBtn} onClick={cancelarEdicao}>Cancelar</button>
+                      <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarEdicao} disabled={salvando}>
+                        {salvando ? 'Salvando...' : 'Salvar'}
+                      </button>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <button onClick={() => { setSelected(null); setEditandoStatus(false); setAlertaCampos(null) }} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                       Voltar
                     </button>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button style={{ ...s.backBtn, color: '#ef4444', borderColor: '#ef4444' }} onClick={() => setConfirmExcluirVoluntario(true)}>Excluir</button>
-                      <button style={s.editBtn} onClick={iniciarEdicao}>Editar</button>
-                    </div>
+                    <button style={s.editBtn} onClick={iniciarEdicao}>Editar</button>
                   </>
                 )}
               </div>
