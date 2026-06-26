@@ -1506,10 +1506,12 @@ export default function Dashboard() {
                         {ev.equipe && <div style={{ display: 'flex', gap: '10px' }}><span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '90px' }}>Equipe</span><span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{ev.equipe}</span></div>}
                         {ev.descricao && <div style={{ display: 'flex', gap: '10px' }}><span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 700, minWidth: '90px' }}>Observações</span><span style={{ fontSize: '13px', color: '#0f1117', fontWeight: 600 }}>{ev.descricao}</span></div>}
                       </div>
-                      <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-                        <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null); setModalEvento({ tipo: 'editar', evento: ev }); const d = ev.data; setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', organizacaoId: ev.organizacaoId || null }) }}>Editar</button>
-                        <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => { if (window.confirm(`Excluir "${ev.titulo}"?`)) { /* excluirEvento handled outside */ } }}>Excluir</button>
-                      </div>
+                      {perfilUsuario === 'admin' && (
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
+                          <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null); setModalEvento({ tipo: 'editar', evento: ev }); const d = ev.data; setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', organizacaoId: ev.organizacaoId || null }) }}>Editar</button>
+                          <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => { if (window.confirm(`Excluir "${ev.titulo}"?`)) { /* excluirEvento handled outside */ } }}>Excluir</button>
+                        </div>
+                      )}
                     </div>
                   )
                 })()}
@@ -3786,7 +3788,7 @@ export default function Dashboard() {
                                 <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#0f1117', color: '#fff', borderColor: '#0f1117' }} onClick={() => { excluirEvento(modalEvento.evento.id); setConfirmarExclusao(false) }}>Sim, excluir</button>
                               </div>
                             </div>
-                          ) : (
+                          ) : perfilUsuario === 'admin' ? (
                             <div style={{ display: 'flex', gap: '10px' }}>
                               <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => {
                                 const ev = modalEvento.evento
@@ -3796,7 +3798,7 @@ export default function Dashboard() {
                               }}>Editar</button>
                               <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => setConfirmarExclusao(true)}>Excluir</button>
                             </div>
-                          )}
+                          ) : null}
                         </>
                       )}
                     </div>
