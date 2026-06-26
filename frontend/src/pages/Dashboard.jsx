@@ -3223,6 +3223,26 @@ export default function Dashboard() {
               </div>
 
             </div>
+
+            {/* Modal confirmar exclusão de voluntário */}
+            {confirmExcluirVoluntario && (
+              <div style={s.modalOverlay} onClick={() => setConfirmExcluirVoluntario(false)}>
+                <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', padding: '28px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                  <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '8px' }}>Excluir voluntário</h3>
+                  <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Tem certeza que deseja excluir <strong>{selected?.nome_completo}</strong>? Esta ação não pode ser desfeita.</p>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => setConfirmExcluirVoluntario(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                    <button onClick={async () => {
+                      const { error } = await supabase.from('voluntarios').delete().eq('id', selected.id)
+                      if (error) { alert('Erro ao excluir: ' + error.message); return }
+                      setVoluntarios(list => list.filter(v => v.id !== selected.id))
+                      setSelected(null)
+                      setConfirmExcluirVoluntario(false)
+                    }} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Excluir</button>
+                  </div>
+                </div>
+              </div>
+            )}
           )}
 
           {menu === 'agenda' && (() => {
@@ -4494,26 +4514,6 @@ export default function Dashboard() {
 
           {menu === 'evangelismo' && (
             <>
-              {/* Modal confirmar exclusão de voluntário */}
-              {confirmExcluirVoluntario && selected && (
-                <div style={s.modalOverlay} onClick={() => setConfirmExcluirVoluntario(false)}>
-                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', padding: '28px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
-                    <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '8px' }}>Excluir voluntário</h3>
-                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Tem certeza que deseja excluir <strong>{selected.nome_completo}</strong>? Esta ação não pode ser desfeita.</p>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button onClick={() => setConfirmExcluirVoluntario(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
-                      <button onClick={async () => {
-                        const { error } = await supabase.from('voluntarios').delete().eq('id', selected.id)
-                        if (error) { alert('Erro ao excluir: ' + error.message); return }
-                        setVoluntarios(list => list.filter(v => v.id !== selected.id))
-                        setSelected(null)
-                        setConfirmExcluirVoluntario(false)
-                      }} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Excluir</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Modal nova abordagem */}
               {/* Modal confirmar exclusão de abordagem */}
               {confirmExcluirAbordagem && (
