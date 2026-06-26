@@ -150,6 +150,7 @@ export default function Dashboard() {
   const [erroUsuario, setErroUsuario] = useState('')
   const [selectedUsuario, setSelectedUsuario] = useState(null)
   const [confirmDeleteUsuario, setConfirmDeleteUsuario] = useState(false)
+  const [confirmExcluirVoluntario, setConfirmExcluirVoluntario] = useState(false)
   const [erroEquipeObrigatoria, setErroEquipeObrigatoria] = useState(false)
   const [deletandoUsuario, setDeletandoUsuario] = useState(false)
   const [editandoUsuario, setEditandoUsuario] = useState(false)
@@ -3012,7 +3013,10 @@ export default function Dashboard() {
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                       Voltar
                     </button>
-                    <button style={s.editBtn} onClick={iniciarEdicao}>Editar</button>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button style={{ ...s.backBtn, color: '#ef4444', borderColor: '#ef4444' }} onClick={() => setConfirmExcluirVoluntario(true)}>Excluir</button>
+                      <button style={s.editBtn} onClick={iniciarEdicao}>Editar</button>
+                    </div>
                   </>
                 )}
               </div>
@@ -4428,6 +4432,25 @@ export default function Dashboard() {
 
           {menu === 'evangelismo' && (
             <>
+              {/* Modal confirmar exclusão de voluntário */}
+              {confirmExcluirVoluntario && selected && (
+                <div style={s.modalOverlay} onClick={() => setConfirmExcluirVoluntario(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', padding: '28px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '8px' }}>Excluir voluntário</h3>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Tem certeza que deseja excluir <strong>{selected.nome_completo}</strong>? Esta ação não pode ser desfeita.</p>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => setConfirmExcluirVoluntario(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                      <button onClick={async () => {
+                        await supabase.from('voluntarios').delete().eq('id', selected.id)
+                        setVoluntarios(list => list.filter(v => v.id !== selected.id))
+                        setSelected(null)
+                        setConfirmExcluirVoluntario(false)
+                      }} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Excluir</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Modal nova abordagem */}
               {/* Modal confirmar exclusão de abordagem */}
               {confirmExcluirAbordagem && (
