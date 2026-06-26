@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
+import Cropper from 'react-easy-crop'
 import MapaLocal from '../components/MapaLocal'
 import MapaEvangelismo from '../components/MapaEvangelismo'
 import { useAuth } from '../contexts/AuthContext'
@@ -94,6 +95,15 @@ export default function Dashboard() {
   const [fotoUsuario, setFotoUsuario] = useState('')
   const [modalEditarPerfilAberto, setModalEditarPerfilAberto] = useState(false)
   const [enviandoFotoPerfil, setEnviandoFotoPerfil] = useState(false)
+  const [subMenuFoto, setSubMenuFoto] = useState(false)
+  const [editandoNome, setEditandoNome] = useState(false)
+  const [novoNome, setNovoNome] = useState('')
+  const [salvandoNome, setSalvandoNome] = useState(false)
+  const [cropSrc, setCropSrc] = useState(null)
+  const [expandirFoto, setExpandirFoto] = useState(false)
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
   const [formVoluntario, setFormVoluntario] = useState({ nome_completo: '', idade: '', whatsapp: '', instagram: '', cidade_estado_pais: '', igreja: '', estado_civil: '', conjuge_na_missao: '', motivo_conjuge_ausente: '', tempo_na_igreja: '', como_serve_igreja: '', nome_pastor: '', contato_pastor_lider: '', nome_emergencia: '', telefone_emergencia: '', ja_participou_missao: '', limitacao_fisica: '', fala_ingles: false, fala_espanhol: false, canta: false, toca_instrumento: false, tira_fotos: false, faz_filmagens: false, outras_competencias: false, outra_competencia_descricao: '', sexo: '' })
   const [carregandoVoluntario, setCarregandoVoluntario] = useState(false)
   const [salvandoVoluntario, setSalvandoVoluntario] = useState(false)
@@ -105,9 +115,10 @@ export default function Dashboard() {
   const [permissoesOriginais, setPermissoesOriginais] = useState(null)
   const [salvandoPermissoes, setSalvandoPermissoes] = useState(false)
   const [minhaEquipe, setMinhaEquipe] = useState(null)
+  const [meusGrupos, setMeusGrupos] = useState([])
   const [editandoStatus, setEditandoStatus] = useState(false)
   const [alertaCampos, setAlertaCampos] = useState(null)
-  const [painelCruzada, setPainelCruzada] = useState({ eventosManha: [], eventosTarde: [], comunicados: [], equipes: [], totalUsuarios: 0, totalVoluntarios: 0, fotosAnuncios: [] })
+  const [painelCruzada, setPainelCruzada] = useState({ eventosManha: [], eventosTarde: [], comunicados: [], equipes: [], totalUsuarios: 0, totalVoluntarios: 0, fotosAnuncios: [], proximaDataAgenda: null })
   const [carrosselIdx, setCarrosselIdx] = useState(0)
   const carrosselTimer = useRef(null)
   const [editando, setEditando] = useState(false)
@@ -120,10 +131,13 @@ export default function Dashboard() {
   const [locais, setLocais] = useState([])
   const [buscaLocal, setBuscaLocal] = useState('')
   const [localSelecionado, setLocalSelecionado] = useState(null)
+  const [modalEditarLocal, setModalEditarLocal] = useState(false)
+  const [formEditarLocal, setFormEditarLocal] = useState({})
+  const [salvandoLocal, setSalvandoLocal] = useState(false)
+  const [confirmExcluirLocal, setConfirmExcluirLocal] = useState(false)
   const [viewLocais, setViewLocais] = useState('mapa')
   const [modalNovoLocal, setModalNovoLocal] = useState(false)
-  const [formNovoLocal, setFormNovoLocal] = useState({ tipo: '', nome: '', endereco: '', bairro: '', regiao: '' })
-  const [salvandoLocal, setSalvandoLocal] = useState(false)
+  const [formNovoLocal, setFormNovoLocal] = useState({ tipo: '', nome: '', endereco: '', bairro: '', regiao: '', municipio: '', uf: '' })
   const [menuMobileAberto, setMenuMobileAberto] = useState(false)
   const [tooltip, setTooltip] = useState(null)
   const [filtro, setFiltro] = useState(null)
@@ -138,6 +152,9 @@ export default function Dashboard() {
   const [deletandoUsuario, setDeletandoUsuario] = useState(false)
   const [editandoUsuario, setEditandoUsuario] = useState(false)
   const [formEditUsuario, setFormEditUsuario] = useState({})
+  const [buscaVolVinculo, setBuscaVolVinculo] = useState('')
+  const [sugestoesVolVinculo, setSugestoesVolVinculo] = useState([])
+  const [vinculandoVol, setVinculandoVol] = useState(false)
   const [salvandoEdicaoUsuario, setSalvandoEdicaoUsuario] = useState(false)
   const [buscaVoluntario, setBuscaVoluntario] = useState('')
   const [sugestoesVoluntario, setSugestoesVoluntario] = useState([])
@@ -253,6 +270,8 @@ export default function Dashboard() {
       setPermissoesOriginais(permData || [])
       const { data: minhaEquipeData } = await supabase.from('usuario_equipes').select('equipes(nome, cor)').eq('usuario_id', user?.id).limit(1)
       setMinhaEquipe(minhaEquipeData?.[0]?.equipes || null)
+      const { data: gruposData } = await supabase.from('usuario_grupos').select('grupos(nome)').eq('usuario_id', user?.id)
+      setMeusGrupos((gruposData || []).map(r => r.grupos?.nome).filter(Boolean))
       if (data?.nome) setNomeUsuario(data.nome)
       setFotoUsuario(data?.foto_url || '')
       if (data?.perfil) {
@@ -382,6 +401,15 @@ export default function Dashboard() {
   }, [isNovaAbordagemPage])
 
   useEffect(() => {
+    if (modalNovoLocal || modalEditarLocal) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [modalNovoLocal, modalEditarLocal])
+
+  useEffect(() => {
     if (pessoaIdPage && pessoasKanban.length > 0) {
       const p = pessoasKanban.find(x => x.id === pessoaIdPage)
       if (p) {
@@ -507,15 +535,51 @@ export default function Dashboard() {
       endereco: formNovoLocal.endereco || null,
       bairro: formNovoLocal.bairro || null,
       regiao: formNovoLocal.regiao || null,
+      municipio: formNovoLocal.municipio || null,
+      uf: formNovoLocal.uf || null,
     })
     setSalvandoLocal(false)
     if (!error) {
       setModalNovoLocal(false)
-      setFormNovoLocal({ tipo: '', nome: '', endereco: '', bairro: '', regiao: '' })
+      setFormNovoLocal({ tipo: '', nome: '', endereco: '', bairro: '', regiao: '', municipio: '', uf: '' })
       carregarLocais()
     }
   }
 
+
+  async function excluirLocal() {
+    if (!localSelecionado) return
+    const { error } = await supabase.from('locais').delete().eq('id', localSelecionado.id)
+    if (!error) {
+      setLocais(prev => prev.filter(l => l.id !== localSelecionado.id))
+      setLocalSelecionado(null)
+      setBuscaLocal('')
+      setModalEditarLocal(false)
+      setConfirmExcluirLocal(false)
+    }
+  }
+
+  async function salvarEdicaoLocal() {
+    if (!formEditarLocal.nome?.trim()) return
+    setSalvandoLocal(true)
+    const { error } = await supabase.from('locais').update({
+      nome: formEditarLocal.nome,
+      tipo: formEditarLocal.tipo || null,
+      endereco: formEditarLocal.endereco || null,
+      bairro: formEditarLocal.bairro || null,
+      regiao: formEditarLocal.regiao || null,
+      municipio: formEditarLocal.municipio || null,
+      uf: formEditarLocal.uf || null,
+      observacao: formEditarLocal.observacao || null,
+    }).eq('id', localSelecionado.id)
+    setSalvandoLocal(false)
+    if (!error) {
+      const updated = { ...localSelecionado, ...formEditarLocal }
+      setLocalSelecionado(updated)
+      setLocais(prev => prev.map(l => l.id === localSelecionado.id ? updated : l))
+      setModalEditarLocal(false)
+    }
+  }
 
   async function carregarUsuarios() {
     setLoadingUsers(true)
@@ -544,21 +608,60 @@ export default function Dashboard() {
     navigate('/login')
   }
 
-  async function handleSelecionarFotoPerfil(e) {
+  async function salvarNome() {
+    if (!novoNome.trim() || !user?.id) return
+    setSalvandoNome(true)
+    await supabase.from('usuarios').update({ nome: novoNome.trim() }).eq('id', user.id)
+    setNomeUsuario(novoNome.trim())
+    setEditandoNome(false)
+    setSalvandoNome(false)
+  }
+
+  async function handleRemoverFotoPerfil() {
+    if (!user?.id) return
+    await supabase.from('usuarios').update({ foto_url: null }).eq('id', user.id)
+    setFotoUsuario(null)
+    setSubMenuFoto(false)
+  }
+
+  function handleSelecionarFotoPerfil(e) {
     const arquivo = e.target.files?.[0]
+    if (!arquivo) return
+    setSubMenuFoto(false)
+    const reader = new FileReader()
+    reader.onload = () => { setCropSrc(reader.result); setCrop({ x: 0, y: 0 }); setZoom(1) }
+    reader.readAsDataURL(arquivo)
     e.target.value = ''
-    if (!arquivo || !user?.id) return
+  }
+
+  async function confirmarCrop() {
+    if (!cropSrc || !croppedAreaPixels || !user?.id) return
     setEnviandoFotoPerfil(true)
-    const extensao = arquivo.name.split('.').pop()
-    const caminho = `${user.id}/${Date.now()}.${extensao}`
-    const { error: erroUpload } = await supabase.storage.from('fotos-perfil').upload(caminho, arquivo, { upsert: true })
+    setCropSrc(null)
+    const blob = await getCroppedBlob(cropSrc, croppedAreaPixels)
+    const caminho = `${user.id}/${Date.now()}.jpg`
+    const { error: erroUpload } = await supabase.storage.from('fotos-perfil').upload(caminho, blob, { upsert: true, contentType: 'image/jpeg' })
     if (!erroUpload) {
       const { data: urlData } = supabase.storage.from('fotos-perfil').getPublicUrl(caminho)
-      const novaFotoUrl = urlData.publicUrl
-      await supabase.from('usuarios').update({ foto_url: novaFotoUrl }).eq('id', user.id)
-      setFotoUsuario(novaFotoUrl)
+      await supabase.from('usuarios').update({ foto_url: urlData.publicUrl }).eq('id', user.id)
+      setFotoUsuario(urlData.publicUrl)
     }
     setEnviandoFotoPerfil(false)
+  }
+
+  async function getCroppedBlob(imageSrc, pixelCrop) {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = reject
+      img.src = imageSrc
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = pixelCrop.width
+    canvas.height = pixelCrop.height
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height)
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92))
   }
 
   function iniciarEdicao() {
@@ -821,6 +924,42 @@ export default function Dashboard() {
     setSugestoesVoluntario(unicos)
   }
 
+  async function buscarVolParaVinculo(texto) {
+    if (!texto.trim()) { setSugestoesVolVinculo([]); return }
+    const { data } = await supabase.from('voluntarios').select('id, nome_completo').ilike('nome_completo', `%${texto}%`).is('usuario_id', null).limit(6)
+    setSugestoesVolVinculo(data || [])
+  }
+
+  async function vincularVoluntario(volId) {
+    if (!selectedUsuario?.id) return
+    setVinculandoVol(true)
+    await supabase.from('voluntarios').update({ usuario_id: selectedUsuario.id }).eq('id', volId)
+    setSugestoesVolVinculo([])
+    setBuscaVolVinculo('✓ Vinculado')
+    setVinculandoVol(false)
+  }
+
+  async function garantirRegistroVoluntario(usuarioId, nome) {
+    const { data: existente } = await supabase.from('voluntarios').select('id').eq('usuario_id', usuarioId).maybeSingle()
+    if (!existente) {
+      const { error } = await supabase.from('voluntarios').insert({
+        usuario_id: usuarioId,
+        nome_completo: nome || '',
+        status: 'pendente',
+        idade: 0,
+        whatsapp: '',
+        cidade_estado_pais: '',
+        igreja: '',
+        contato_pastor_lider: '',
+        como_serve_igreja: '',
+        tempo_na_igreja: '',
+        estado_civil: 'solteiro',
+        ja_participou_missao: false,
+      })
+      if (error) console.error('Erro ao criar voluntário:', error)
+    }
+  }
+
   async function ativarUsuario(u) {
     const novoAtivo = !u.ativo
     const temEquipe = usuarioOrgs.equipes.length > 0 || !!formEditUsuario.equipe_id
@@ -837,6 +976,11 @@ export default function Dashboard() {
     await supabase.from('usuarios').update({ ativo: novoAtivo }).eq('id', u.id)
     setSelectedUsuario(v => ({ ...v, ativo: novoAtivo }))
     setUsuarios(list => list.map(x => x.id === u.id ? { ...x, ativo: novoAtivo } : x))
+    const perfilAtual = formEditUsuario.perfil || u.perfil
+    if (novoAtivo && perfilAtual === 'voluntario') {
+      await garantirRegistroVoluntario(u.id, u.nome)
+      carregarVoluntarios()
+    }
   }
 
   async function salvarEdicaoUsuario() {
@@ -862,6 +1006,10 @@ export default function Dashboard() {
     setSelectedUsuario(v => ({ ...v, perfil: formEditUsuario.perfil }))
     setUsuarios(list => list.map(x => x.id === selectedUsuario.id ? { ...x, perfil: formEditUsuario.perfil } : x))
     setEditandoUsuario(false)
+    if (formEditUsuario.perfil === 'voluntario') {
+      await garantirRegistroVoluntario(selectedUsuario.id, selectedUsuario.nome)
+      carregarVoluntarios()
+    }
     setSelectedUsuario(null)
     setErroEquipeObrigatoria(false)
   }
@@ -1130,8 +1278,25 @@ export default function Dashboard() {
       comunicados = msgs || []
     }
 
-    const eventosManha = eventos.filter(e => (e.hora_inicio || '00:00') < '12:00')
-    const eventosTarde = eventos.filter(e => (e.hora_inicio || '00:00') >= '12:00')
+    let eventosManha = eventos.filter(e => (e.hora_inicio || '00:00') < '12:00')
+    let eventosTarde = eventos.filter(e => (e.hora_inicio || '00:00') >= '12:00')
+    let proximaDataAgenda = null
+
+    if (eventos.length === 0) {
+      const { data: proximos } = await supabase
+        .from('eventos')
+        .select('id, titulo, data, hora_inicio, locais(nome)')
+        .gt('data', dataStr)
+        .order('data')
+        .order('hora_inicio')
+        .limit(20)
+      if (proximos && proximos.length > 0) {
+        proximaDataAgenda = proximos[0].data
+        const eventosProximos = proximos.filter(e => e.data === proximaDataAgenda)
+        eventosManha = eventosProximos.filter(e => (e.hora_inicio || '00:00') < '12:00')
+        eventosTarde = eventosProximos.filter(e => (e.hora_inicio || '00:00') >= '12:00')
+      }
+    }
 
     setPainelCruzada({
       eventosManha,
@@ -1141,6 +1306,7 @@ export default function Dashboard() {
       totalUsuarios: totalUsuariosData,
       totalVoluntarios: totalVolData,
       fotosAnuncios,
+      proximaDataAgenda,
     })
   }
 
@@ -1221,6 +1387,36 @@ export default function Dashboard() {
 
   return (
     <div style={s.page}>
+
+      {/* Modal cropper de foto */}
+      {cropSrc && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', zIndex: 3000, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Cropper
+              image={cropSrc}
+              crop={crop}
+              zoom={zoom}
+              aspect={1}
+              cropShape="round"
+              showGrid={false}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={(_, pixels) => setCroppedAreaPixels(pixels)}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '12px', padding: '20px', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
+            <button onClick={() => setCropSrc(null)} style={{ flex: 1, maxWidth: '160px', padding: '12px', borderRadius: '10px', border: 'none', background: '#374151', color: '#fff', fontSize: '15px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+            <button onClick={confirmarCrop} style={{ flex: 1, maxWidth: '160px', padding: '12px', borderRadius: '10px', border: 'none', background: '#F97310', color: '#fff', fontSize: '15px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Usar foto</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal expandir foto */}
+      {expandirFoto && fotoUsuario && (
+        <div onClick={() => setExpandirFoto(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
+          <img src={fotoUsuario} alt="Foto" style={{ width: '280px', height: '280px', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 8px 48px rgba(0,0,0,0.5)' }} />
+        </div>
+      )}
 
       {/* Modal lista do dia - agenda */}
       {agendaDiaModal && (
@@ -1340,6 +1536,9 @@ export default function Dashboard() {
           .nova-abordagem-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; top: 64px !important; }
           .nova-abordagem-inner { border-radius: 0 !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; padding: 24px 20px 100px !important; overflow-y: visible !important; }
           .nova-abordagem-voltar { display: flex !important; }
+          .local-modal-overlay { background: #fff !important; align-items: flex-start !important; padding: 0 !important; overflow-y: auto !important; top: 64px !important; }
+          .local-modal-inner { border-radius: 0 !important; max-width: 100% !important; height: auto !important; max-height: none !important; box-shadow: none !important; padding: 24px 20px 100px !important; overflow-y: visible !important; }
+          .local-modal-voltar { display: flex !important; }
           .treinamento-layout { grid-template-columns: 1fr !important; }
           .edit-abordagem-btns { justify-content: space-between !important; }
           .edit-abordagem-btns button { flex: 1 !important; text-align: center !important; }
@@ -1460,20 +1659,71 @@ export default function Dashboard() {
                 <form onSubmit={handleSalvarVoluntario} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
                   {/* Foto */}
-                  <div style={{ background: '#f9fafb', borderRadius: '12px', padding: '20px', textAlign: 'center' }}>
-                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', margin: '0 auto 14px', overflow: 'hidden', background: '#F97310', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: 800, color: '#fff' }}>
-                      {fotoUsuario ? <img src={fotoUsuario} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(nomeUsuario || user?.email)}
+                  <div style={{ background: '#f9fafb', borderRadius: '12px', padding: '28px 20px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', position: 'relative' }}>
+                    <div style={{ position: 'relative' }}>
+                      <div onClick={() => fotoUsuario && setExpandirFoto(true)} style={{ width: '96px', height: '96px', borderRadius: '50%', overflow: 'hidden', background: '#F97310', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '34px', fontWeight: 800, color: '#fff', cursor: fotoUsuario ? 'zoom-in' : 'default' }}>
+                        {fotoUsuario ? <img src={fotoUsuario} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(nomeUsuario || user?.email)}
+                      </div>
+                      <button type="button" onClick={() => setSubMenuFoto(v => !v)} style={{ position: 'absolute', bottom: 2, right: 2, width: '28px', height: '28px', borderRadius: '50%', background: '#F97310', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
                     </div>
-                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                      <label style={{ ...s.editBtn, background: '#F97310', color: '#fff', display: 'inline-block', cursor: enviandoFotoPerfil ? 'default' : 'pointer', opacity: enviandoFotoPerfil ? 0.6 : 1 }}>
-                        {enviandoFotoPerfil ? 'Enviando...' : 'Galeria'}
-                        <input type="file" accept="image/*" onChange={handleSelecionarFotoPerfil} disabled={enviandoFotoPerfil} style={{ display: 'none' }} />
-                      </label>
-                      <label style={{ ...s.editBtn, background: '#0f1117', color: '#fff', border: 'none', display: 'inline-block', cursor: enviandoFotoPerfil ? 'default' : 'pointer', opacity: enviandoFotoPerfil ? 0.6 : 1 }}>
-                        {enviandoFotoPerfil ? 'Enviando...' : 'Tirar foto'}
-                        <input type="file" accept="image/*" capture="user" onChange={handleSelecionarFotoPerfil} disabled={enviandoFotoPerfil} style={{ display: 'none' }} />
-                      </label>
-                    </div>
+                    {editandoNome ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          autoFocus
+                          style={{ ...s.inputEdit, fontSize: '15px', fontWeight: 700, textAlign: 'center', padding: '6px 10px' }}
+                          value={novoNome}
+                          onChange={e => setNovoNome(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') salvarNome(); if (e.key === 'Escape') setEditandoNome(false) }}
+                        />
+                        <button type="button" onClick={salvarNome} disabled={salvandoNome} style={{ background: '#F97310', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 12px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                          {salvandoNome ? '...' : 'Salvar'}
+                        </button>
+                        <button type="button" onClick={() => setEditandoNome(false)} style={{ background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', padding: '6px 10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <p style={{ fontWeight: 700, fontSize: '16px', color: '#0f1117', margin: 0, textAlign: 'center' }}>{nomeUsuario || 'Sem nome'}</p>
+                        <button type="button" onClick={() => { setNovoNome(nomeUsuario || ''); setEditandoNome(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#9ca3af', display: 'flex', alignItems: 'center' }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                      </div>
+                    )}
+                    {minhaEquipe && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: minhaEquipe.cor || '#9ca3af', flexShrink: 0 }} />
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#6b7280' }}>{minhaEquipe.nome}</span>
+                      </div>
+                    )}
+                    {meusGrupos.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
+                        {meusGrupos.map(g => (
+                          <span key={g} style={{ fontSize: '11px', fontWeight: 600, color: '#F97310', background: '#fff4ec', borderRadius: '20px', padding: '2px 10px' }}>{g}</span>
+                        ))}
+                      </div>
+                    )}
+                    {enviandoFotoPerfil && <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>Enviando...</p>}
+                    {subMenuFoto && (
+                      <div style={{ position: 'absolute', top: '140px', left: '50%', transform: 'translateX(-50%)', background: '#fff', borderRadius: '12px', boxShadow: '0 4px 24px rgba(0,0,0,0.15)', border: '1px solid #e5e7eb', zIndex: 10, minWidth: '180px', overflow: 'hidden' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #f3f4f6' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F97310" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                          Galeria
+                          <input type="file" accept="image/*" onChange={handleSelecionarFotoPerfil} style={{ display: 'none' }} />
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#374151', borderBottom: fotoUsuario ? '1px solid #f3f4f6' : 'none' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F97310" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                          Tirar foto
+                          <input type="file" accept="image/*" capture="user" onChange={handleSelecionarFotoPerfil} style={{ display: 'none' }} />
+                        </label>
+                        {fotoUsuario && (
+                          <button type="button" onClick={handleRemoverFotoPerfil} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600, color: '#dc2626', fontFamily: 'inherit' }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                            Remover foto
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Dados Pessoais */}
@@ -1658,7 +1908,7 @@ export default function Dashboard() {
                 {fotosAnuncios.length > 0 && (() => {
                   const idx = carrosselIdx % fotosAnuncios.length
                   clearTimeout(carrosselTimer.current)
-                  carrosselTimer.current = setTimeout(() => setCarrosselIdx(i => i + 1), 4000)
+                  carrosselTimer.current = setTimeout(() => setCarrosselIdx(i => i + 1), 12000)
                   return (
                     <div style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', background: '#0f1117', aspectRatio: '16/6', maxHeight: '220px' }}>
                       <img src={fotosAnuncios[idx].url} alt="Anúncio" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -1675,21 +1925,15 @@ export default function Dashboard() {
 
                 {/* Próximas Ações */}
                 <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px' }}>
-                  <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Agenda de Hoje</p>
-                  <div style={{ marginBottom: '12px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Manhã (até 12h)</div>
-                    {eventosManha.length === 0
-                      ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum evento</div>
-                      : eventosManha.map(ev => <EventoCard key={ev.id} ev={ev} />)
-                    }
-                  </div>
-                  <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '12px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Tarde / Noite (após 12h)</div>
-                    {eventosTarde.length === 0
-                      ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum evento</div>
-                      : eventosTarde.map(ev => <EventoCard key={ev.id} ev={ev} />)
-                    }
-                  </div>
+                  <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>
+                    {painelCruzada.proximaDataAgenda
+                      ? `Próxima agenda — ${new Date(painelCruzada.proximaDataAgenda + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}`
+                      : 'Agenda de Hoje'}
+                  </p>
+                  {[...eventosManha, ...eventosTarde].length === 0
+                    ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum evento cadastrado</div>
+                    : [...eventosManha, ...eventosTarde].map(ev => <EventoCard key={ev.id} ev={ev} />)
+                  }
                 </div>
 
                 {/* Comunicados */}
@@ -2567,18 +2811,42 @@ export default function Dashboard() {
 
           {menu === 'voluntarios' && !selected && !novoVoluntario && (
             <>
-              <div className="vol-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <div className="vol-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <h2 style={{ ...s.pageTitle, margin: 0 }}>Voluntários</h2>
                 <button className="btn-novo-vol" onClick={() => setNovoVoluntario(true)} style={{ ...s.editBtn, background: '#F97310', color: '#fff' }}>+ Novo Voluntário</button>
               </div>
-              {loadingVol && <p style={s.info}>Carregando...</p>}
-
-              {!loadingVol && voluntarios.length === 0 && <p style={s.info}>Nenhum voluntário cadastrado ainda.</p>}
-              <div style={s.cards}>
-                {voluntarios.map(v => (
-                  <VoluntarioCard key={v.id} v={v} onClick={() => { const f = camposFaltando(v); setAlertaCampos(f.length > 0 ? { nome: v.nome_completo, campos: f } : null); setSelected(v) }} />
-                ))}
+              <div style={{ marginBottom: '16px', position: 'relative' }}>
+                <svg style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input
+                  style={{ ...s.inputEdit, paddingLeft: '38px', paddingRight: buscaVoluntario ? '36px' : '12px' }}
+                  placeholder="Pesquisar por nome, WhatsApp ou cidade..."
+                  value={buscaVoluntario}
+                  onChange={e => setBuscaVoluntario(e.target.value)}
+                />
+                {buscaVoluntario && (
+                  <button onClick={() => setBuscaVoluntario('')} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '16px', lineHeight: 1, padding: 0 }}>✕</button>
+                )}
               </div>
+              {loadingVol && <p style={s.info}>Carregando...</p>}
+              {!loadingVol && voluntarios.length === 0 && <p style={s.info}>Nenhum voluntário cadastrado ainda.</p>}
+              {(() => {
+                const lista = buscaVoluntario.trim()
+                  ? voluntarios.filter(v => {
+                      const q = buscaVoluntario.toLowerCase()
+                      return v.nome_completo?.toLowerCase().includes(q) || v.whatsapp?.includes(q) || v.cidade_estado_pais?.toLowerCase().includes(q)
+                    })
+                  : voluntarios
+                return (
+                  <>
+                    {buscaVoluntario && <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '12px' }}>{lista.length} resultado{lista.length !== 1 ? 's' : ''}</p>}
+                    <div style={s.cards}>
+                      {lista.map(v => (
+                        <VoluntarioCard key={v.id} v={v} onClick={() => { const f = camposFaltando(v); setAlertaCampos(f.length > 0 ? { nome: v.nome_completo, campos: f } : null); setSelected(v) }} />
+                      ))}
+                    </div>
+                  </>
+                )
+              })()}
             </>
           )}
 
@@ -3615,9 +3883,15 @@ export default function Dashboard() {
               <h2 style={s.pageTitle}>Locais</h2>
 
               {modalNovoLocal && (
-                <div style={s.modalOverlay} onClick={() => setModalNovoLocal(false)}>
-                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                <div className="local-modal-overlay" style={s.modalOverlay} onClick={() => setModalNovoLocal(false)}>
+                  <div className="local-modal-inner" style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative' }} onClick={e => e.stopPropagation()}>
                     <button onClick={() => setModalNovoLocal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151' }}>✕</button>
+                    <div className="local-modal-voltar" style={{ display: 'none', marginBottom: '16px' }}>
+                      <button onClick={() => setModalNovoLocal(false)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        Voltar
+                      </button>
+                    </div>
                     <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '24px' }}>Novo local</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                       <div>
@@ -3636,10 +3910,90 @@ export default function Dashboard() {
                         <label style={s.fieldLabel}>Bairro</label>
                         <input style={s.inputEdit} value={formNovoLocal.bairro} onChange={e => setFormNovoLocal(f => ({ ...f, bairro: e.target.value }))} placeholder="Bairro" />
                       </div>
+                      <div>
+                        <label style={s.fieldLabel}>Região</label>
+                        <input style={s.inputEdit} value={formNovoLocal.regiao} onChange={e => setFormNovoLocal(f => ({ ...f, regiao: e.target.value }))} placeholder="Região" />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ flex: 2 }}>
+                          <label style={s.fieldLabel}>Município</label>
+                          <input style={s.inputEdit} value={formNovoLocal.municipio} onChange={e => setFormNovoLocal(f => ({ ...f, municipio: e.target.value }))} placeholder="Município" />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={s.fieldLabel}>UF</label>
+                          <input style={s.inputEdit} value={formNovoLocal.uf} onChange={e => setFormNovoLocal(f => ({ ...f, uf: e.target.value }))} placeholder="MG" maxLength={2} />
+                        </div>
+                      </div>
                       <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                         <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => setModalNovoLocal(false)}>Cancelar</button>
                         <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1, textAlign: 'center', border: 'none' }} onClick={salvarNovoLocal} disabled={salvandoLocal}>{salvandoLocal ? 'Salvando...' : 'Salvar'}</button>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {modalEditarLocal && (
+                <div className="local-modal-overlay" style={s.modalOverlay} onClick={() => setModalEditarLocal(false)}>
+                  <div className="local-modal-inner" style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setModalEditarLocal(false)} style={{ position: 'absolute', top: '16px', right: '16px', background: '#f3f4f6', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontSize: '14px', fontWeight: 700, color: '#374151' }}>✕</button>
+                    <div className="local-modal-voltar" style={{ display: 'none', marginBottom: '16px' }}>
+                      <button onClick={() => setModalEditarLocal(false)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                        Voltar
+                      </button>
+                    </div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '24px' }}>Editar local</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                      <div>
+                        <label style={s.fieldLabel}>Nome *</label>
+                        <input style={s.inputEdit} value={formEditarLocal.nome || ''} onChange={e => setFormEditarLocal(f => ({ ...f, nome: e.target.value }))} placeholder="Nome do local" autoFocus />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Tipo</label>
+                        <input style={s.inputEdit} value={formEditarLocal.tipo || ''} onChange={e => setFormEditarLocal(f => ({ ...f, tipo: e.target.value }))} placeholder="Ex: Igreja, Escola..." />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Endereço</label>
+                        <input style={s.inputEdit} value={formEditarLocal.endereco || ''} onChange={e => setFormEditarLocal(f => ({ ...f, endereco: e.target.value }))} placeholder="Rua, número..." />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Bairro</label>
+                        <input style={s.inputEdit} value={formEditarLocal.bairro || ''} onChange={e => setFormEditarLocal(f => ({ ...f, bairro: e.target.value }))} placeholder="Bairro" />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Região</label>
+                        <input style={s.inputEdit} value={formEditarLocal.regiao || ''} onChange={e => setFormEditarLocal(f => ({ ...f, regiao: e.target.value }))} placeholder="Região" />
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <div style={{ flex: 2 }}>
+                          <label style={s.fieldLabel}>Município</label>
+                          <input style={s.inputEdit} value={formEditarLocal.municipio || ''} onChange={e => setFormEditarLocal(f => ({ ...f, municipio: e.target.value }))} placeholder="Município" />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={s.fieldLabel}>UF</label>
+                          <input style={s.inputEdit} value={formEditarLocal.uf || ''} onChange={e => setFormEditarLocal(f => ({ ...f, uf: e.target.value }))} placeholder="MG" maxLength={2} />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Observação</label>
+                        <textarea style={{ ...s.inputEdit, minHeight: '72px', resize: 'vertical' }} value={formEditarLocal.observacao || ''} onChange={e => setFormEditarLocal(f => ({ ...f, observacao: e.target.value }))} placeholder="Observações..." />
+                      </div>
+                      {confirmExcluirLocal ? (
+                        <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: '10px', padding: '14px', marginTop: '4px' }}>
+                          <p style={{ fontSize: '14px', color: '#b91c1c', fontWeight: 600, marginBottom: '12px' }}>Tem certeza que deseja excluir este local?</p>
+                          <div style={{ display: 'flex', gap: '10px' }}>
+                            <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => setConfirmExcluirLocal(false)}>Cancelar</button>
+                            <button style={{ ...s.editBtn, background: '#dc2626', color: '#fff', flex: 1, textAlign: 'center', border: 'none' }} onClick={excluirLocal}>Excluir</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                          <button style={{ ...s.editBtn, background: '#fef2f2', color: '#dc2626', border: '1.5px solid #fca5a5' }} onClick={() => setConfirmExcluirLocal(true)}>Excluir</button>
+                          <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => setModalEditarLocal(false)}>Cancelar</button>
+                          <button style={{ ...s.editBtn, background: '#F97310', color: '#fff', flex: 1, textAlign: 'center', border: 'none' }} onClick={salvarEdicaoLocal} disabled={salvandoLocal}>{salvandoLocal ? 'Salvando...' : 'Salvar'}</button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -3693,6 +4047,14 @@ export default function Dashboard() {
                       Como chegar
                     </a>
                   )}
+                  {perfilUsuario === 'admin' && localSelecionado && (
+                    <button
+                      onClick={() => { setFormEditarLocal({ nome: localSelecionado.nome, endereco: localSelecionado.endereco || '', bairro: localSelecionado.bairro || '', regiao: localSelecionado.regiao || '', municipio: localSelecionado.municipio || '', uf: localSelecionado.uf || '', tipo: localSelecionado.tipo || '', observacao: localSelecionado.observacao || '' }); setModalEditarLocal(true) }}
+                      style={{ ...s.editBtn, position: 'absolute', top: '12px', left: '12px', zIndex: 1000, fontSize: '13px', background: '#fff', color: '#374151', border: '1.5px solid #e5e7eb' }}
+                    >
+                      Editar
+                    </button>
+                  )}
                   <button
                     onClick={async () => {
                       if (!navigator.geolocation) return alert('Seu navegador não suporta geolocalização.')
@@ -3717,7 +4079,7 @@ export default function Dashboard() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                     <thead>
                       <tr style={{ background: '#f9fafb', borderBottom: '2px solid #F97310' }}>
-                        {['Tipo', 'Nome', 'Endereço', 'Bairro', 'Região'].map(h => (
+                        {['Tipo', 'Nome', 'Endereço'].map(h => (
                           <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 800, color: '#0f1117', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
                         ))}
                       </tr>
@@ -3731,10 +4093,6 @@ export default function Dashboard() {
                           <td style={{ padding: '10px 16px', color: '#6b7280' }}>{l.tipo}</td>
                           <td style={{ padding: '10px 16px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</td>
                           <td style={{ padding: '10px 16px', color: '#6b7280' }}>{l.endereco || '—'}</td>
-                          <td style={{ padding: '10px 16px', color: '#6b7280' }}>{l.bairro}</td>
-                          <td style={{ padding: '10px 16px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#F97310', background: '#fff4ec', borderRadius: '4px', padding: '2px 8px' }}>{l.regiao}</span>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -4626,6 +4984,27 @@ export default function Dashboard() {
                             </select>
                           </div>
 
+                          {(formEditUsuario.perfil ?? selectedUsuario.perfil) === 'voluntario' && (
+                            <div style={{ position: 'relative' }}>
+                              <label style={s.fieldLabel}>Vincular voluntário</label>
+                              <input
+                                style={s.inputEdit}
+                                placeholder="Buscar por nome..."
+                                value={buscaVolVinculo}
+                                onChange={e => { setBuscaVolVinculo(e.target.value); buscarVolParaVinculo(e.target.value) }}
+                              />
+                              {sugestoesVolVinculo.length > 0 && (
+                                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '8px', zIndex: 20, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                                  {sugestoesVolVinculo.map(v => (
+                                    <button key={v.id} type="button" onClick={() => vincularVoluntario(v.id)} disabled={vinculandoVol} style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#374151', fontFamily: 'inherit' }}>
+                                      {v.nome_completo}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <EquipeRadio
                             itens={equipes}
                             selecionado={formEditUsuario.equipe_id !== undefined ? formEditUsuario.equipe_id : (usuarioOrgs.equipes[0] || null)}
@@ -4851,7 +5230,6 @@ function VoluntarioCard({ v, onClick }) {
       <div style={s.cardInfo}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={s.cardNome}>{(() => { const p = (v.nome_completo || '').trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1]}` : p[0] })()}</span>
-          {pendente && <span style={{ fontSize: '11px', fontWeight: 700, color: '#F97310', background: '#fff4ec', border: '1px solid #fed7aa', borderRadius: '4px', padding: '1px 6px' }}>incompleto</span>}
         </div>
         <div style={s.cardSub}>{v.cidade_estado_pais}</div>
         <div style={s.cardSub}>{v.idade} anos</div>
@@ -5124,7 +5502,7 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    zIndex: 2000,
     padding: '24px',
   },
   modal: {

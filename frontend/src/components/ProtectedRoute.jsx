@@ -10,14 +10,23 @@ export default function ProtectedRoute({ children }) {
 
   useEffect(() => {
     if (!user) { setCheckando(false); return }
-    const check = () => supabase.from('usuarios').select('ativo').eq('id', user.id).single().then(({ data }) => {
+    const check = async () => {
+      const { data } = await supabase.from('usuarios').select('ativo').eq('id', user.id).single()
       if (!data) {
-        setTimeout(check, 800)
+        await supabase.from('usuarios').insert({
+          id: user.id,
+          nome: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+          email: user.email,
+          perfil: 'voluntario',
+          ativo: false,
+        })
+        setAtivo(false)
+        setCheckando(false)
         return
       }
       setAtivo(data.ativo === true ? true : false)
       setCheckando(false)
-    })
+    }
     check()
   }, [user])
 
