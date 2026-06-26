@@ -118,7 +118,7 @@ export default function Dashboard() {
   const [meusGrupos, setMeusGrupos] = useState([])
   const [editandoStatus, setEditandoStatus] = useState(false)
   const [alertaCampos, setAlertaCampos] = useState(null)
-  const [painelCruzada, setPainelCruzada] = useState({ eventosManha: [], eventosTarde: [], comunicados: [], equipes: [], totalUsuarios: 0, totalVoluntarios: 0, fotosAnuncios: [], proximaDataAgenda: null })
+  const [painelCruzada, setPainelCruzada] = useState({ eventosManha: [], eventosTarde: [], comunicados: [], equipes: [], totalUsuarios: 0, totalVoluntarios: 0, totalCompletos: 0, fotosAnuncios: [], proximaDataAgenda: null })
   const [carrosselIdx, setCarrosselIdx] = useState(0)
   const carrosselTimer = useRef(null)
   const [editando, setEditando] = useState(false)
@@ -213,6 +213,7 @@ export default function Dashboard() {
   const [agendaDiaSelecionado, setAgendaDiaSelecionado] = useState(null) // { diaObj, evsDia }
   const [agendaDiaModal, setAgendaDiaModal] = useState(null) // modal da lista do dia
   const [agendaDiaEventoAberto, setAgendaDiaEventoAberto] = useState(null) // evento aberto no modal do dia
+  const [dropEquipe, setDropEquipe] = useState(false)
   const [mobileDiaSel, setMobileDiaSel] = useState(new Date())
 
   // Evangelismo
@@ -1256,14 +1257,16 @@ export default function Dashboard() {
       supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').eq('data', dataStr).order('hora_inicio'),
       supabase.from('grupos').select('id, nome').ilike('nome', '%geral%').limit(1),
       supabase.from('usuarios').select('id', { count: 'exact', head: true }).eq('ativo', true),
-      supabase.from('voluntarios').select('id', { count: 'exact', head: true }).not('usuario_id', 'is', null),
+      supabase.from('voluntarios').select('id, nome_completo, idade, whatsapp, instagram, cidade_estado_pais, igreja, nome_pastor, contato_pastor_lider, como_serve_igreja, tempo_na_igreja, estado_civil, conjuge_na_missao, motivo_conjuge_ausente, ja_participou_missao, nome_emergencia, telefone_emergencia').not('usuario_id', 'is', null),
       supabase.from('equipes').select('id, nome, cor').order('nome'),
       supabase.from('albuns').select('id').ilike('nome', '%anúncios cruzada%').limit(1),
     ])
     const eventos = resEventos.data || []
     const grupos = resGrupos.data || []
     const totalUsuariosData = resUsuarios.count ?? 0
-    const totalVolData = resVol.count ?? 0
+    const todosVols = resVol.data || []
+    const totalVolData = todosVols.length
+    const totalCompletos = todosVols.filter(v => camposFaltando(v).length === 0).length
     const equipes = resEquipes.data || []
     let fotosAnuncios = []
     if (resAlbum.data && resAlbum.data.length > 0) {
@@ -1305,6 +1308,7 @@ export default function Dashboard() {
       equipes,
       totalUsuarios: totalUsuariosData,
       totalVoluntarios: totalVolData,
+      totalCompletos,
       fotosAnuncios,
       proximaDataAgenda,
     })
@@ -1376,10 +1380,16 @@ export default function Dashboard() {
       sexo: fv.sexo || null, status: 'pendente',
     }
     if (voluntarioId) {
-      await supabase.from('voluntarios').update(payload).eq('id', voluntarioId)
+      const { error } = await supabase.from('voluntarios').update(payload).eq('id', voluntarioId)
+      if (error) { console.error('Erro ao atualizar voluntário:', error); setSalvandoVoluntario(false); return }
     } else {
-      const { data } = await supabase.from('voluntarios').insert([payload]).select().single()
+      const { data, error } = await supabase.from('voluntarios').insert([payload]).select().single()
+      if (error) { console.error('Erro ao inserir voluntário:', error); setSalvandoVoluntario(false); return }
       if (data) setVoluntarioId(data.id)
+    }
+    if (fv.nome_completo?.trim()) {
+      await supabase.from('usuarios').update({ nome: fv.nome_completo.trim() }).eq('id', user.id)
+      setNomeUsuario(fv.nome_completo.trim())
     }
     setSalvandoVoluntario(false)
     setModalEditarPerfilAberto(false)
@@ -1668,28 +1678,7 @@ export default function Dashboard() {
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
                     </div>
-                    {editandoNome ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input
-                          autoFocus
-                          style={{ ...s.inputEdit, fontSize: '15px', fontWeight: 700, textAlign: 'center', padding: '6px 10px' }}
-                          value={novoNome}
-                          onChange={e => setNovoNome(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') salvarNome(); if (e.key === 'Escape') setEditandoNome(false) }}
-                        />
-                        <button type="button" onClick={salvarNome} disabled={salvandoNome} style={{ background: '#F97310', color: '#fff', border: 'none', borderRadius: '8px', padding: '6px 12px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
-                          {salvandoNome ? '...' : 'Salvar'}
-                        </button>
-                        <button type="button" onClick={() => setEditandoNome(false)} style={{ background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '8px', padding: '6px 10px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <p style={{ fontWeight: 700, fontSize: '16px', color: '#0f1117', margin: 0, textAlign: 'center' }}>{nomeUsuario || 'Sem nome'}</p>
-                        <button type="button" onClick={() => { setNovoNome(nomeUsuario || ''); setEditandoNome(true) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: '#9ca3af', display: 'flex', alignItems: 'center' }}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                        </button>
-                      </div>
-                    )}
+                    <p style={{ fontWeight: 700, fontSize: '16px', color: '#0f1117', margin: 0, textAlign: 'center' }}>{nomeUsuario || 'Sem nome'}</p>
                     {minhaEquipe && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: minhaEquipe.cor || '#9ca3af', flexShrink: 0 }} />
@@ -1883,8 +1872,8 @@ export default function Dashboard() {
           {!modalEditarPerfilAberto && (<>
 
           {menu === 'cruzada' && (() => {
-            const { eventosManha, eventosTarde, comunicados, equipes, totalUsuarios, totalVoluntarios, fotosAnuncios } = painelCruzada
-            const pct = totalUsuarios > 0 ? Math.round((totalVoluntarios / totalUsuarios) * 100) : 0
+            const { eventosManha, eventosTarde, comunicados, equipes, totalUsuarios, totalVoluntarios, totalCompletos, fotosAnuncios } = painelCruzada
+            const pct = totalVoluntarios > 0 ? Math.round((totalCompletos / totalVoluntarios) * 100) : 0
             const fmtHora = (str) => str ? str.substring(11, 16) : ''
             const fmtData = (str) => {
               if (!str) return ''
@@ -1932,7 +1921,7 @@ export default function Dashboard() {
                   </p>
                   {[...eventosManha, ...eventosTarde].length === 0
                     ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum evento cadastrado</div>
-                    : [...eventosManha, ...eventosTarde].map(ev => <EventoCard key={ev.id} ev={ev} />)
+                    : <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>{[...eventosManha, ...eventosTarde].map(ev => <EventoCard key={ev.id} ev={ev} />)}</div>
                   }
                 </div>
 
@@ -1954,7 +1943,7 @@ export default function Dashboard() {
                 <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px' }}>
                   <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Cadastros de Voluntário</p>
                   <div style={{ fontSize: '32px', fontWeight: 900, color: '#0f1117', marginBottom: '4px' }}>{pct}%</div>
-                  <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '14px' }}>{totalVoluntarios} de {totalUsuarios} usuários preencheram o cadastro</div>
+                  <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '14px' }}>{totalCompletos} de {totalVoluntarios} voluntários com cadastro completo</div>
                   <div style={{ background: '#f3f4f6', borderRadius: '999px', height: '10px', overflow: 'hidden' }}>
                     <div style={{ width: `${pct}%`, height: '100%', background: '#F97310', borderRadius: '999px', transition: 'width 0.5s' }} />
                   </div>
@@ -3175,7 +3164,7 @@ export default function Dashboard() {
             }
             function abrirNovoEvento(dia) {
               if (locais.length === 0) carregarLocais()
-              setFormEvento({ titulo: '', data: toInputDate(dia), horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', equipeId: null })
+              setFormEvento({ titulo: '', data: toInputDate(dia), horaInicio: '09:00', horaFim: '10:00', cor: '#F97310', descricao: '', local: '', localId: null, equipe: '', equipeId: null, equipesSelecionadas: [] })
               setModalEvento({ tipo: 'novo', dia })
             }
             async function salvarEvento() {
@@ -3188,7 +3177,7 @@ export default function Dashboard() {
                 cor: formEvento.cor,
                 descricao: formEvento.descricao || null,
                 local_id: formEvento.localId || null,
-                equipe_id: formEvento.equipeId || null,
+                equipe_id: formEvento.equipesSelecionadas?.length === 1 ? formEvento.equipesSelecionadas[0].id : (formEvento.equipeId || null),
               }
               const { data, error } = await supabase.from('eventos').insert(payload).select('*, locais(nome), equipes(nome)').single()
               if (!error && data) {
@@ -3519,42 +3508,61 @@ export default function Dashboard() {
                                 <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEvento.horaFim} onChange={e => setFormEvento(f => ({ ...f, horaFim: e.target.value }))} />
                               </div>
                             </div>
-                            {/* Local + Equipe em 2 colunas */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                              <div style={{ position: 'relative' }}>
-                                <label style={s.fieldLabel}>Local</label>
-                                <input style={s.inputEdit} value={formEvento.local} onChange={e => setFormEvento(f => ({ ...f, local: e.target.value, localId: null }))} placeholder="Pesquisar local..." autoComplete="off" />
-                                {formEvento.local.length > 0 && !formEvento.localId && locais.filter(l => l.nome.toLowerCase().includes(formEvento.local.toLowerCase()) || l.bairro?.toLowerCase().includes(formEvento.local.toLowerCase())).length > 0 && (
-                                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
-                                    {locais.filter(l => l.nome.toLowerCase().includes(formEvento.local.toLowerCase()) || l.bairro?.toLowerCase().includes(formEvento.local.toLowerCase())).slice(0, 8).map(l => (
-                                      <div key={l.id}
-                                        style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
-                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                                        onClick={() => setFormEvento(f => ({ ...f, local: l.nome, localId: l.id }))}>
-                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
+                            {/* Local */}
+                            <div style={{ position: 'relative' }}>
+                              <label style={s.fieldLabel}>Local</label>
+                              <input style={s.inputEdit} value={formEvento.local} onChange={e => setFormEvento(f => ({ ...f, local: e.target.value, localId: null }))} placeholder="Pesquisar local..." autoComplete="off" />
+                              {formEvento.local.length > 0 && !formEvento.localId && locais.filter(l => l.nome.toLowerCase().includes(formEvento.local.toLowerCase()) || l.bairro?.toLowerCase().includes(formEvento.local.toLowerCase())).length > 0 && (
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
+                                  {locais.filter(l => l.nome.toLowerCase().includes(formEvento.local.toLowerCase()) || l.bairro?.toLowerCase().includes(formEvento.local.toLowerCase())).slice(0, 8).map(l => (
+                                    <div key={l.id}
+                                      style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
+                                      onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                                      onClick={() => setFormEvento(f => ({ ...f, local: l.nome, localId: l.id }))}>
+                                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            {/* Equipes - dropdown multi-select */}
+                            <div style={{ position: 'relative' }}>
+                              <label style={s.fieldLabel}>Equipes</label>
+                              <div onClick={() => setDropEquipe(d => !d)}
+                                style={{ ...s.inputEdit, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minHeight: '42px' }}>
+                                {(formEvento.equipesSelecionadas || []).length === 0
+                                  ? <span style={{ color: '#9ca3af', fontSize: '14px' }}>Selecionar equipes...</span>
+                                  : (formEvento.equipesSelecionadas || []).map(e => (
+                                      <span key={e.id} title={e.nome} style={{ width: '20px', height: '20px', borderRadius: '50%', background: e.cor || '#ccc', display: 'inline-block', border: '2px solid #fff', boxShadow: '0 0 0 1.5px rgba(0,0,0,0.15)', flexShrink: 0 }} />
+                                    ))
+                                }
+                                <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#9ca3af' }}>{dropEquipe ? '▲' : '▼'}</span>
                               </div>
-                              <div style={{ position: 'relative' }}>
-                                <label style={s.fieldLabel}>Equipe</label>
-                                <input style={s.inputEdit} value={formEvento.equipe} onChange={e => setFormEvento(f => ({ ...f, equipe: e.target.value, equipeId: null }))} placeholder="Pesquisar equipe..." autoComplete="off" />
-                                {formEvento.equipe.length > 0 && !formEvento.equipeId && equipes.filter(o => o.nome.toLowerCase().includes(formEvento.equipe.toLowerCase())).length > 0 && (
-                                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
-                                    {equipes.filter(o => o.nome.toLowerCase().includes(formEvento.equipe.toLowerCase())).slice(0, 8).map(o => (
-                                      <div key={o.id}
-                                        style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
-                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                                        onClick={() => setFormEvento(f => ({ ...f, equipe: o.nome, equipeId: o.id }))}>
-                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{o.nome}</div>
-                                      </div>
-                                    ))}
+                              {dropEquipe && (
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 20, overflow: 'hidden' }}>
+                                  <div onClick={() => { setFormEvento(f => ({ ...f, equipesSelecionadas: [] })); setDropEquipe(false) }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: '#fafafa' }}>
+                                    <span style={{ fontSize: '14px', color: '#9ca3af', fontStyle: 'italic' }}>Nenhuma</span>
                                   </div>
-                                )}
-                              </div>
+                                  {equipes.map(o => {
+                                    const sel = (formEvento.equipesSelecionadas || []).some(e => e.id === o.id)
+                                    return (
+                                      <div key={o.id} onClick={() => setFormEvento(f => {
+                                        const lista = f.equipesSelecionadas || []
+                                        return { ...f, equipesSelecionadas: sel ? lista.filter(e => e.id !== o.id) : [...lista, { id: o.id, nome: o.nome, cor: o.cor }] }
+                                      })}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: sel ? '#fff8f3' : '#fff' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                        onMouseLeave={e => e.currentTarget.style.background = sel ? '#fff8f3' : '#fff'}>
+                                        <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: o.cor || '#ccc', flexShrink: 0, border: '2px solid #e5e7eb' }} />
+                                        <span style={{ fontSize: '14px', fontWeight: sel ? 700 : 400, color: '#0f1117', flex: 1 }}>{o.nome}</span>
+                                        {sel && <span style={{ color: '#F97310', fontWeight: 700, fontSize: '16px' }}>✓</span>}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
                             </div>
                             <div>
                               <label style={s.fieldLabel}>Descrição</label>
