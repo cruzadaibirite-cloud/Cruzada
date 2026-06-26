@@ -13,7 +13,8 @@ export default function App() {
         <Route path="/cruzada" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/cadastro-voluntario" element={<CadastroVoluntario />} />
-        <Route path="/sistema" element={<ProtectedRoute><Navigate to="/sistema/voluntario" replace /></ProtectedRoute>} />
+        <Route path="/sistema" element={<ProtectedRoute><Navigate to="/sistema/cruzada" replace /></ProtectedRoute>} />
+        <Route path="/sistema/cruzada" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/voluntario" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/usuarios" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/sistema/usuarios/:usuarioId" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

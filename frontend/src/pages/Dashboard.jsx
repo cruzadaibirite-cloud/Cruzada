@@ -6,6 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 const MENU = [
+  { key: 'cruzada', label: 'Cruzada', path: '/sistema/cruzada', perfis: ['admin', 'voluntario', 'igreja', 'lider'] },
   { key: 'voluntarios', label: 'Voluntários', path: '/sistema/voluntario', perfis: ['admin'] },
   { key: 'usuarios', label: 'Usuários', path: '/sistema/usuarios', perfis: ['admin'] },
   { key: 'locais', label: 'Locais', path: '/sistema/locais', perfis: ['admin', 'voluntario'] },
@@ -73,7 +74,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = () => window.innerWidth < 768
-  const menu = location.pathname === '/sistema/voluntario' ? 'voluntarios' : (location.pathname === '/sistema/usuarios' || location.pathname.startsWith('/sistema/usuarios/')) ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/grupos' || location.pathname.startsWith('/sistema/grupos/') ? 'grupos' : location.pathname === '/sistema/galeria' ? 'galeria' : location.pathname === '/sistema/dashboard' ? 'dashboard' : location.pathname === '/sistema/controle' ? 'controle' : 'voluntarios'
+  const menu = location.pathname === '/sistema/cruzada' ? 'cruzada' : location.pathname === '/sistema/voluntario' ? 'voluntarios' : (location.pathname === '/sistema/usuarios' || location.pathname.startsWith('/sistema/usuarios/')) ? 'usuarios' : location.pathname === '/sistema/locais' ? 'locais' : location.pathname === '/sistema/agenda' ? 'agenda' : (location.pathname === '/sistema/evangelismo' || location.pathname === '/sistema/evangelismo/nova-abordagem') ? 'evangelismo' : (location.pathname === '/sistema/pessoas' || location.pathname.startsWith('/sistema/pessoas/')) ? 'pessoas' : location.pathname === '/sistema/mapa' ? 'mapa' : location.pathname === '/sistema/treinamento' ? 'treinamento' : location.pathname === '/sistema/grupos' || location.pathname.startsWith('/sistema/grupos/') ? 'grupos' : location.pathname === '/sistema/galeria' ? 'galeria' : location.pathname === '/sistema/dashboard' ? 'dashboard' : location.pathname === '/sistema/controle' ? 'controle' : 'cruzada'
   const isNovaAbordagemPage = location.pathname === '/sistema/evangelismo/nova-abordagem'
   const pessoaIdPage = location.pathname.startsWith('/sistema/pessoas/') ? location.pathname.split('/sistema/pessoas/')[1] : null
   const usuarioIdPage = location.pathname.startsWith('/sistema/usuarios/') ? location.pathname.split('/sistema/usuarios/')[1] : null
@@ -93,6 +94,12 @@ export default function Dashboard() {
   const [fotoUsuario, setFotoUsuario] = useState('')
   const [modalEditarPerfilAberto, setModalEditarPerfilAberto] = useState(false)
   const [enviandoFotoPerfil, setEnviandoFotoPerfil] = useState(false)
+  const [formVoluntario, setFormVoluntario] = useState({ nome_completo: '', idade: '', whatsapp: '', instagram: '', cidade_estado_pais: '', igreja: '', estado_civil: '', conjuge_na_missao: '', motivo_conjuge_ausente: '', tempo_na_igreja: '', como_serve_igreja: '', nome_pastor: '', contato_pastor_lider: '', nome_emergencia: '', telefone_emergencia: '', ja_participou_missao: '', limitacao_fisica: '', fala_ingles: false, fala_espanhol: false, canta: false, toca_instrumento: false, tira_fotos: false, faz_filmagens: false, outras_competencias: false, outra_competencia_descricao: '', sexo: '' })
+  const [carregandoVoluntario, setCarregandoVoluntario] = useState(false)
+  const [salvandoVoluntario, setSalvandoVoluntario] = useState(false)
+  const [voluntarioId, setVoluntarioId] = useState(null)
+  const [cidadeSugestoesPerf, setCidadeSugestoesPerf] = useState([])
+  const cidadeTimerPerf = useRef(null)
   const [perfilUsuario, setPerfilUsuario] = useState('')
   const [permissoes, setPermissoes] = useState(null)
   const [permissoesOriginais, setPermissoesOriginais] = useState(null)
@@ -100,6 +107,9 @@ export default function Dashboard() {
   const [minhaEquipe, setMinhaEquipe] = useState(null)
   const [editandoStatus, setEditandoStatus] = useState(false)
   const [alertaCampos, setAlertaCampos] = useState(null)
+  const [painelCruzada, setPainelCruzada] = useState({ eventosManha: [], eventosTarde: [], comunicados: [], equipes: [], totalUsuarios: 0, totalVoluntarios: 0, fotosAnuncios: [] })
+  const [carrosselIdx, setCarrosselIdx] = useState(0)
+  const carrosselTimer = useRef(null)
   const [editando, setEditando] = useState(false)
   const [formEdit, setFormEdit] = useState({})
   const [novoVoluntario, setNovoVoluntario] = useState(false)
@@ -347,6 +357,7 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    if (menu === 'cruzada') carregarPainelCruzada()
     if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'grupos') carregarGrupos()
@@ -1087,6 +1098,127 @@ export default function Dashboard() {
     setEditandoStatus(false)
   }
 
+  async function carregarPainelCruzada() {
+    const hoje = new Date()
+    const dataStr = `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`
+    const meiodia = `${dataStr}T12:00:00`
+    const fimDia = `${dataStr}T23:59:59`
+
+    const [resEventos, resGrupos, resUsuarios, resVol, resEquipes, resAlbum] = await Promise.all([
+      supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').eq('data', dataStr).order('hora_inicio'),
+      supabase.from('grupos').select('id, nome').ilike('nome', '%geral%').limit(1),
+      supabase.from('usuarios').select('id', { count: 'exact', head: true }).eq('ativo', true),
+      supabase.from('voluntarios').select('id', { count: 'exact', head: true }).not('usuario_id', 'is', null),
+      supabase.from('equipes').select('id, nome, cor').order('nome'),
+      supabase.from('albuns').select('id').ilike('nome', '%anúncios cruzada%').limit(1),
+    ])
+    const eventos = resEventos.data || []
+    const grupos = resGrupos.data || []
+    const totalUsuariosData = resUsuarios.count ?? 0
+    const totalVolData = resVol.count ?? 0
+    const equipes = resEquipes.data || []
+    let fotosAnuncios = []
+    if (resAlbum.data && resAlbum.data.length > 0) {
+      const { data: fotos } = await supabase.from('fotos').select('url').eq('album_id', resAlbum.data[0].id).order('criado_em', { ascending: true })
+      fotosAnuncios = fotos || []
+    }
+
+    let comunicados = []
+    if (grupos.length > 0) {
+      const grupoId = grupos[0].id
+      const { data: msgs } = await supabase.from('mensagens_grupo').select('mensagem, usuario_id, usuarios(nome)').eq('grupo_id', grupoId).order('id', { ascending: false }).limit(5)
+      comunicados = msgs || []
+    }
+
+    const eventosManha = eventos.filter(e => (e.hora_inicio || '00:00') < '12:00')
+    const eventosTarde = eventos.filter(e => (e.hora_inicio || '00:00') >= '12:00')
+
+    setPainelCruzada({
+      eventosManha,
+      eventosTarde,
+      comunicados,
+      equipes,
+      totalUsuarios: totalUsuariosData,
+      totalVoluntarios: totalVolData,
+      fotosAnuncios,
+    })
+  }
+
+  async function carregarVoluntario() {
+    setCarregandoVoluntario(true)
+    const { data } = await supabase.from('voluntarios').select('*').eq('usuario_id', user.id).maybeSingle()
+    if (data) {
+      setVoluntarioId(data.id)
+      setFormVoluntario({
+        nome_completo: data.nome_completo || '', idade: data.idade || '', whatsapp: data.whatsapp || '',
+        instagram: data.instagram || '', cidade_estado_pais: data.cidade_estado_pais || '',
+        igreja: data.igreja || '', estado_civil: data.estado_civil || '',
+        conjuge_na_missao: data.conjuge_na_missao === true ? 'sim' : data.conjuge_na_missao === false ? 'nao' : '',
+        motivo_conjuge_ausente: data.motivo_conjuge_ausente || '', tempo_na_igreja: data.tempo_na_igreja || '',
+        como_serve_igreja: data.como_serve_igreja || '', nome_pastor: data.nome_pastor || '',
+        contato_pastor_lider: data.contato_pastor_lider || '', nome_emergencia: data.nome_emergencia || '',
+        telefone_emergencia: data.telefone_emergencia || '',
+        ja_participou_missao: data.ja_participou_missao === true ? 'sim' : data.ja_participou_missao === false ? 'nao' : '',
+        limitacao_fisica: data.limitacao_fisica || '', fala_ingles: data.fala_ingles || false,
+        fala_espanhol: data.fala_espanhol || false, canta: data.canta || false,
+        toca_instrumento: data.toca_instrumento || false, tira_fotos: data.tira_fotos || false,
+        faz_filmagens: data.faz_filmagens || false, outras_competencias: data.outras_competencias || false,
+        outra_competencia_descricao: data.outra_competencia_descricao || '', sexo: data.sexo || '',
+      })
+    }
+    setCarregandoVoluntario(false)
+  }
+
+  function setFV(key, value) { setFormVoluntario(f => ({ ...f, [key]: value })) }
+
+  function buscarCidadePerf(valor) {
+    setFV('cidade_estado_pais', valor)
+    clearTimeout(cidadeTimerPerf.current)
+    if (valor.length < 3) { setCidadeSugestoesPerf([]); return }
+    cidadeTimerPerf.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(valor)}&format=json&addressdetails=1&limit=6&featureType=city`)
+        const dados = await res.json()
+        const sugestoes = dados.map(item => {
+          const a = item.address
+          const cidade = a.city || a.town || a.village || a.municipality || a.county || ''
+          return [cidade, a.state || '', a.country || ''].filter(Boolean).join(', ')
+        }).filter((v, i, arr) => v && arr.indexOf(v) === i)
+        setCidadeSugestoesPerf(sugestoes)
+      } catch {}
+    }, 400)
+  }
+
+  async function handleSalvarVoluntario(e) {
+    e.preventDefault()
+    setSalvandoVoluntario(true)
+    const fv = formVoluntario
+    const payload = {
+      usuario_id: user.id,
+      nome_completo: fv.nome_completo, idade: parseInt(fv.idade) || null,
+      whatsapp: fv.whatsapp, instagram: fv.instagram, cidade_estado_pais: fv.cidade_estado_pais,
+      igreja: fv.igreja, nome_pastor: fv.nome_pastor, contato_pastor_lider: fv.contato_pastor_lider,
+      como_serve_igreja: fv.como_serve_igreja, tempo_na_igreja: fv.tempo_na_igreja,
+      estado_civil: fv.estado_civil,
+      conjuge_na_missao: fv.estado_civil === 'casado' ? fv.conjuge_na_missao === 'sim' : null,
+      motivo_conjuge_ausente: fv.motivo_conjuge_ausente || null,
+      nome_emergencia: fv.nome_emergencia, telefone_emergencia: fv.telefone_emergencia,
+      limitacao_fisica: fv.limitacao_fisica || null, ja_participou_missao: fv.ja_participou_missao === 'sim',
+      fala_ingles: fv.fala_ingles, fala_espanhol: fv.fala_espanhol, canta: fv.canta,
+      toca_instrumento: fv.toca_instrumento, tira_fotos: fv.tira_fotos, faz_filmagens: fv.faz_filmagens,
+      outras_competencias: fv.outras_competencias, outra_competencia_descricao: fv.outra_competencia_descricao || null,
+      sexo: fv.sexo || null, status: 'pendente',
+    }
+    if (voluntarioId) {
+      await supabase.from('voluntarios').update(payload).eq('id', voluntarioId)
+    } else {
+      const { data } = await supabase.from('voluntarios').insert([payload]).select().single()
+      if (data) setVoluntarioId(data.id)
+    }
+    setSalvandoVoluntario(false)
+    setModalEditarPerfilAberto(false)
+  }
+
   return (
     <div style={s.page}>
 
@@ -1264,7 +1396,7 @@ export default function Dashboard() {
 
       {/* Header */}
       <div style={s.header} className="dash-header">
-        <div style={s.headerLogo} className="dash-header-logo">
+        <div style={{ ...s.headerLogo, cursor: 'pointer' }} className="dash-header-logo" onClick={() => navigate('/sistema/cruzada')}>
           <img src="/icon-512.png" alt="Logo" style={{ height: '22px', width: 'auto' }} />
           <span style={s.headerTitle} className="dash-header-title">Cruzada <span style={{ color: '#F97310' }}>Ibirité</span></span>
         </div>
@@ -1285,7 +1417,7 @@ export default function Dashboard() {
                   <div style={s.dropdownDivider} />
                 </>
               )}
-              <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false); setModalEditarPerfilAberto(true) }}>Editar perfil</button>
+              <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false); setModalEditarPerfilAberto(true); carregarVoluntario() }}>Editar perfil</button>
               <div style={s.dropdownDivider} />
               <button style={{ ...s.dropdownItem, color: '#0f1117' }} onClick={handleSignOut}>Sair</button>
             </div>
@@ -1311,6 +1443,282 @@ export default function Dashboard() {
 
         {/* Conteúdo */}
         <div style={s.main} className="dash-main">
+
+          {modalEditarPerfilAberto && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                <button onClick={() => setModalEditarPerfilAberto(false)} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', color: '#374151', fontWeight: 700, fontSize: '15px', padding: 0, fontFamily: 'inherit' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  Voltar
+                </button>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', margin: 0 }}>Meu cadastro</h3>
+              </div>
+
+              {carregandoVoluntario ? (
+                <div style={{ color: '#9ca3af', fontSize: '14px' }}>Carregando...</div>
+              ) : (
+                <form onSubmit={handleSalvarVoluntario} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+                  {/* Foto */}
+                  <div style={{ background: '#f9fafb', borderRadius: '12px', padding: '20px', textAlign: 'center' }}>
+                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', margin: '0 auto 14px', overflow: 'hidden', background: '#F97310', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px', fontWeight: 800, color: '#fff' }}>
+                      {fotoUsuario ? <img src={fotoUsuario} alt="Foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(nomeUsuario || user?.email)}
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <label style={{ ...s.editBtn, background: '#F97310', color: '#fff', display: 'inline-block', cursor: enviandoFotoPerfil ? 'default' : 'pointer', opacity: enviandoFotoPerfil ? 0.6 : 1 }}>
+                        {enviandoFotoPerfil ? 'Enviando...' : 'Galeria'}
+                        <input type="file" accept="image/*" onChange={handleSelecionarFotoPerfil} disabled={enviandoFotoPerfil} style={{ display: 'none' }} />
+                      </label>
+                      <label style={{ ...s.editBtn, background: '#0f1117', color: '#fff', border: 'none', display: 'inline-block', cursor: enviandoFotoPerfil ? 'default' : 'pointer', opacity: enviandoFotoPerfil ? 0.6 : 1 }}>
+                        {enviandoFotoPerfil ? 'Enviando...' : 'Tirar foto'}
+                        <input type="file" accept="image/*" capture="user" onChange={handleSelecionarFotoPerfil} disabled={enviandoFotoPerfil} style={{ display: 'none' }} />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Dados Pessoais */}
+                  <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '12px', padding: '20px' }}>
+                    <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Dados Pessoais</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={s.fieldLabel}>Nome Completo</label>
+                        <input style={s.inputEdit} required value={formVoluntario.nome_completo} onChange={e => setFV('nome_completo', e.target.value)} placeholder="Seu nome completo" />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Idade</label>
+                        <input style={s.inputEdit} required type="number" min="16" max="99" value={formVoluntario.idade} onChange={e => setFV('idade', e.target.value)} placeholder="Ex: 25" />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Sexo</label>
+                        <select style={s.inputEdit} required value={formVoluntario.sexo} onChange={e => setFV('sexo', e.target.value)}>
+                          <option value="">Selecione</option>
+                          <option value="masculino">Masculino</option>
+                          <option value="feminino">Feminino</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>WhatsApp com DDD</label>
+                        <input style={s.inputEdit} required value={formVoluntario.whatsapp} onChange={e => setFV('whatsapp', e.target.value)} placeholder="(31) 99999-9999" />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Instagram</label>
+                        <input style={s.inputEdit} required value={formVoluntario.instagram} onChange={e => setFV('instagram', e.target.value)} placeholder="@seuinstagram" />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1', position: 'relative' }}>
+                        <label style={s.fieldLabel}>Cidade, Estado, País</label>
+                        <input style={s.inputEdit} required value={formVoluntario.cidade_estado_pais} onChange={e => buscarCidadePerf(e.target.value)} onBlur={() => setTimeout(() => setCidadeSugestoesPerf([]), 200)} placeholder="Digite sua cidade..." autoComplete="off" />
+                        {cidadeSugestoesPerf.length > 0 && (
+                          <ul style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, listStyle: 'none', margin: '4px 0 0', padding: 0, overflow: 'hidden' }}>
+                            {cidadeSugestoesPerf.map((sg, i) => (
+                              <li key={i} style={{ padding: '10px 14px', fontSize: '14px', color: '#1a1d27', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }} onMouseDown={() => { setFV('cidade_estado_pais', sg); setCidadeSugestoesPerf([]) }}>{sg}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Igreja */}
+                  <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '12px', padding: '20px' }}>
+                    <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Igreja</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={s.fieldLabel}>Nome da Igreja</label>
+                        <input style={s.inputEdit} required value={formVoluntario.igreja} onChange={e => setFV('igreja', e.target.value)} placeholder="Nome da sua igreja" />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Nome do Pastor / Líder</label>
+                        <input style={s.inputEdit} required value={formVoluntario.nome_pastor} onChange={e => setFV('nome_pastor', e.target.value)} placeholder="Nome do pastor ou líder" />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Telefone do Pastor / Líder</label>
+                        <input style={s.inputEdit} required value={formVoluntario.contato_pastor_lider} onChange={e => setFV('contato_pastor_lider', e.target.value)} placeholder="(31) 99999-9999" />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={s.fieldLabel}>Como você serve na sua igreja local?</label>
+                        <textarea style={{ ...s.inputEdit, minHeight: '80px', resize: 'vertical' }} required value={formVoluntario.como_serve_igreja} onChange={e => setFV('como_serve_igreja', e.target.value)} placeholder="Descreva como você serve" />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={s.fieldLabel}>Há quanto tempo está na sua igreja local?</label>
+                        <input style={s.inputEdit} required value={formVoluntario.tempo_na_igreja} onChange={e => setFV('tempo_na_igreja', e.target.value)} placeholder="Ex: 3 anos" />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Estado Civil</label>
+                        <select style={s.inputEdit} required value={formVoluntario.estado_civil} onChange={e => setFV('estado_civil', e.target.value)}>
+                          <option value="">Selecione</option>
+                          <option value="solteiro">Solteiro</option>
+                          <option value="casado">Casado</option>
+                        </select>
+                      </div>
+                      {formVoluntario.estado_civil === 'casado' && (
+                        <>
+                          <div>
+                            <label style={s.fieldLabel}>Seu cônjuge irá na missão?</label>
+                            <select style={s.inputEdit} required value={formVoluntario.conjuge_na_missao} onChange={e => setFV('conjuge_na_missao', e.target.value)}>
+                              <option value="">Selecione</option>
+                              <option value="sim">Sim</option>
+                              <option value="nao">Não</option>
+                            </select>
+                          </div>
+                          {formVoluntario.conjuge_na_missao === 'nao' && (
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <label style={s.fieldLabel}>Se não, por quê?</label>
+                              <textarea style={{ ...s.inputEdit, minHeight: '70px', resize: 'vertical' }} required value={formVoluntario.motivo_conjuge_ausente} onChange={e => setFV('motivo_conjuge_ausente', e.target.value)} placeholder="Explique o motivo" />
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Saúde e Experiência */}
+                  <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '12px', padding: '20px' }}>
+                    <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Saúde e Experiência</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                      <div>
+                        <label style={s.fieldLabel}>Nome de Emergência</label>
+                        <input style={s.inputEdit} required value={formVoluntario.nome_emergencia} onChange={e => setFV('nome_emergencia', e.target.value)} placeholder="Nome do contato" />
+                      </div>
+                      <div>
+                        <label style={s.fieldLabel}>Contato de Emergência</label>
+                        <input style={s.inputEdit} required value={formVoluntario.telefone_emergencia} onChange={e => setFV('telefone_emergencia', e.target.value)} placeholder="(31) 99999-9999" />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={s.fieldLabel}>Limitação física ou remédio especial?</label>
+                        <textarea style={{ ...s.inputEdit, minHeight: '70px', resize: 'vertical' }} value={formVoluntario.limitacao_fisica} onChange={e => setFV('limitacao_fisica', e.target.value)} placeholder="Se não, deixe em branco." />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={s.fieldLabel}>Já participou de viagem missionária?</label>
+                        <select style={s.inputEdit} required value={formVoluntario.ja_participou_missao} onChange={e => setFV('ja_participou_missao', e.target.value)}>
+                          <option value="">Selecione</option>
+                          <option value="sim">Sim</option>
+                          <option value="nao">Não</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Competências */}
+                  <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '12px', padding: '20px' }}>
+                    <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Competências</p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '12px' }}>
+                      {[
+                        { key: 'fala_ingles', label: 'Falo Inglês' }, { key: 'fala_espanhol', label: 'Falo Espanhol' },
+                        { key: 'canta', label: 'Canto' }, { key: 'toca_instrumento', label: 'Toco instrumento' },
+                        { key: 'tira_fotos', label: 'Tiro Fotos' }, { key: 'faz_filmagens', label: 'Faço filmagens' },
+                        { key: 'outras_competencias', label: 'Outros' },
+                      ].map(({ key, label }) => (
+                        <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#374151', fontWeight: 600, cursor: 'pointer' }}>
+                          <input type="checkbox" checked={formVoluntario[key]} onChange={e => setFV(key, e.target.checked)} style={{ accentColor: '#F97310', width: '16px', height: '16px' }} />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                    {formVoluntario.outras_competencias && (
+                      <div style={{ marginTop: '14px' }}>
+                        <label style={s.fieldLabel}>Outra competência</label>
+                        <textarea style={{ ...s.inputEdit, minHeight: '70px', resize: 'vertical' }} required value={formVoluntario.outra_competencia_descricao} onChange={e => setFV('outra_competencia_descricao', e.target.value)} placeholder="Descreva sua competência" />
+                      </div>
+                    )}
+                  </div>
+
+                  <button type="submit" disabled={salvandoVoluntario} style={{ background: '#F97310', color: '#fff', border: 'none', borderRadius: '10px', padding: '14px 32px', fontSize: '15px', fontWeight: 800, cursor: salvandoVoluntario ? 'default' : 'pointer', opacity: salvandoVoluntario ? 0.7 : 1, fontFamily: 'inherit', marginBottom: '16px', alignSelf: 'flex-start' }}>
+                    {salvandoVoluntario ? 'Salvando...' : 'Salvar cadastro'}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
+          {!modalEditarPerfilAberto && (<>
+
+          {menu === 'cruzada' && (() => {
+            const { eventosManha, eventosTarde, comunicados, equipes, totalUsuarios, totalVoluntarios, fotosAnuncios } = painelCruzada
+            const pct = totalUsuarios > 0 ? Math.round((totalVoluntarios / totalUsuarios) * 100) : 0
+            const fmtHora = (str) => str ? str.substring(11, 16) : ''
+            const fmtData = (str) => {
+              if (!str) return ''
+              const [y, m, d] = str.substring(0, 10).split('-')
+              return `${d}/${m}/${y}`
+            }
+            const EventoCard = ({ ev }) => (
+              <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '10px', padding: '14px 16px' }}>
+                <div style={{ fontWeight: 800, fontSize: '15px', color: '#0f1117', marginBottom: '6px' }}>{ev.titulo}</div>
+                <div style={{ fontSize: '13px', color: '#6b7280', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <span>📅 {fmtData(ev.data)}</span>
+                  {ev.hora_inicio && <span>🕒 {ev.hora_inicio.substring(0, 5)}</span>}
+                  {ev.locais?.nome && <span>📌 {ev.locais.nome}</span>}
+                </div>
+              </div>
+            )
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                {/* Carrossel */}
+                {fotosAnuncios.length > 0 && (() => {
+                  const idx = carrosselIdx % fotosAnuncios.length
+                  clearTimeout(carrosselTimer.current)
+                  carrosselTimer.current = setTimeout(() => setCarrosselIdx(i => i + 1), 4000)
+                  return (
+                    <div style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', background: '#0f1117', aspectRatio: '16/6', maxHeight: '220px' }}>
+                      <img src={fotosAnuncios[idx].url} alt="Anúncio" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                      <div style={{ position: 'absolute', bottom: '10px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                        {fotosAnuncios.map((_, i) => (
+                          <button key={i} onClick={() => setCarrosselIdx(i)} style={{ width: i === idx ? '20px' : '8px', height: '8px', borderRadius: '999px', background: i === idx ? '#F97310' : 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s' }} />
+                        ))}
+                      </div>
+                      <button onClick={() => setCarrosselIdx(i => (i - 1 + fotosAnuncios.length) % fotosAnuncios.length)} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.4)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+                      <button onClick={() => setCarrosselIdx(i => (i + 1) % fotosAnuncios.length)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.4)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+                    </div>
+                  )
+                })()}
+
+                {/* Próximas Ações */}
+                <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px' }}>
+                  <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Agenda de Hoje</p>
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Manhã (até 12h)</div>
+                    {eventosManha.length === 0
+                      ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum evento</div>
+                      : eventosManha.map(ev => <EventoCard key={ev.id} ev={ev} />)
+                    }
+                  </div>
+                  <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '12px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Tarde / Noite (após 12h)</div>
+                    {eventosTarde.length === 0
+                      ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum evento</div>
+                      : eventosTarde.map(ev => <EventoCard key={ev.id} ev={ev} />)
+                    }
+                  </div>
+                </div>
+
+                {/* Comunicados */}
+                <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px' }}>
+                  <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Comunicados (Grupo Geral)</p>
+                  {comunicados.length === 0
+                    ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum comunicado</div>
+                    : comunicados.map((c, i) => (
+                      <div key={i} style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: '10px', marginBottom: '10px' }}>
+                        <div style={{ fontSize: '13px', color: '#374151', fontWeight: 600 }}>{c.mensagem}</div>
+                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>{c.usuarios?.nome}</div>
+                      </div>
+                    ))
+                  }
+                </div>
+
+                {/* Progresso */}
+                <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px' }}>
+                  <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Cadastros de Voluntário</p>
+                  <div style={{ fontSize: '32px', fontWeight: 900, color: '#0f1117', marginBottom: '4px' }}>{pct}%</div>
+                  <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '14px' }}>{totalVoluntarios} de {totalUsuarios} usuários preencheram o cadastro</div>
+                  <div style={{ background: '#f3f4f6', borderRadius: '999px', height: '10px', overflow: 'hidden' }}>
+                    <div style={{ width: `${pct}%`, height: '100%', background: '#F97310', borderRadius: '999px', transition: 'width 0.5s' }} />
+                  </div>
+                </div>
+
+              </div>
+            )
+          })()}
 
           {menu === 'grupos' && grupoIdPage && grupoAtivo && (
             <div className="grupo-chat-container" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
@@ -4233,36 +4641,6 @@ export default function Dashboard() {
                             fieldLabel={s.fieldLabel}
                           />
 
-                          <div style={{ position: 'relative' }}>
-                            <label style={s.fieldLabel}>Vincular voluntário</label>
-                            <input
-                              style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #e5e7eb', borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', color: '#1a1d27', outline: 'none', boxSizing: 'border-box', marginTop: '6px' }}
-                              placeholder="Buscar voluntário..."
-                              value={buscaVoluntario}
-                              onChange={e => buscarVoluntariosParaVinculo(e.target.value)}
-                              onBlur={() => setTimeout(() => setSugestoesVoluntario([]), 200)}
-                              autoComplete="off"
-                            />
-                            {selectedUsuario.voluntario_id && !buscaVoluntario && (
-                              <span style={{ fontSize: '12px', color: '#22c55e', fontWeight: 700, marginTop: '4px', display: 'block' }}>✓ já vinculado</span>
-                            )}
-                            {sugestoesVoluntario.length > 0 && (
-                              <ul style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1.5px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 200, listStyle: 'none', margin: '4px 0 0', padding: 0, overflow: 'hidden' }}>
-                                {sugestoesVoluntario.map(vol => (
-                                  <li key={vol.id} onMouseDown={async () => {
-                                    await supabase.from('usuarios').update({ voluntario_id: vol.id }).eq('id', selectedUsuario.id)
-                                    setSelectedUsuario(v => ({ ...v, voluntario_id: vol.id }))
-                                    setUsuarios(list => list.map(x => x.id === selectedUsuario.id ? { ...x, voluntario_id: vol.id } : x))
-                                    setBuscaVoluntario('')
-                                    setSugestoesVoluntario([])
-                                  }} style={{ padding: '9px 14px', fontSize: '13px', cursor: 'pointer', borderBottom: '1px solid #f3f4f6', color: '#1a1d27' }}>
-                                    <div style={{ fontWeight: 700 }}>{vol.nome_completo}</div>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-
                           <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
                             <button style={{ ...s.backBtn, flex: 1, textAlign: 'center' }} onClick={() => { setSelectedUsuario(null); setFormEditUsuario({}); setErroEquipeObrigatoria(false) }}>Cancelar</button>
                             <button style={{ ...s.editBtn, flex: 1, background: '#F97310', color: '#fff', textAlign: 'center', border: 'none' }} onClick={salvarEdicaoUsuario} disabled={salvandoEdicaoUsuario}>{salvandoEdicaoUsuario ? 'Salvando...' : 'Salvar'}</button>
@@ -4305,6 +4683,8 @@ export default function Dashboard() {
             </>
           )}
 
+          </>)}
+
         </div>
       </div>
 
@@ -4316,7 +4696,7 @@ export default function Dashboard() {
           <>
             <div style={{ position: 'fixed', inset: 0, zIndex: 1001 }} onClick={() => setMenuMobileAberto(false)} />
             <div style={{ position: 'fixed', bottom: '64px', left: 0, right: 0, background: '#fff', borderTop: '1px solid #e5e7eb', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '4px', zIndex: 1002, boxShadow: '0 -4px 24px rgba(0,0,0,0.08)', maxHeight: 'calc(100vh - 128px)', overflowY: 'auto' }}>
-            {MENU.filter(item => temAcessoDinamico(perfilUsuario, item.key) && !['voluntarios','usuarios','locais'].includes(item.key)).map(item => (
+            {MENU.filter(item => temAcessoDinamico(perfilUsuario, item.key) && !['evangelismo','pessoas','agenda','cruzada'].includes(item.key)).map(item => (
               <button key={item.key} onClick={() => { navigate(item.path); setMenuMobileAberto(false) }}
                 style={{ display: 'flex', alignItems: 'center', gap: '12px', background: menu === item.key ? '#fff4ec' : 'none', border: 'none', borderRadius: '10px', cursor: 'pointer', color: menu === item.key ? '#F97310' : '#374151', padding: '12px 16px', fontFamily: 'inherit', fontSize: '14px', fontWeight: 700, textAlign: 'left' }}>
                 {item.label}
@@ -4327,20 +4707,20 @@ export default function Dashboard() {
         )}
 
         {[
-          { key: 'voluntarios', path: '/sistema/voluntario', label: 'Voluntários', perfis: ['admin'], icon: (
+          { key: 'evangelismo', path: '/sistema/evangelismo', label: 'Evangelismo', perfis: ['admin', 'voluntario'], icon: (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="2" x2="12" y2="22"/><line x1="4" y1="7" x2="20" y2="7"/>
+            </svg>
+          )},
+          { key: 'pessoas', path: '/sistema/pessoas', label: 'Pessoas', perfis: ['admin', 'voluntario'], icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
           )},
-          { key: 'usuarios', path: '/sistema/usuarios', label: 'Usuários', perfis: ['admin'], icon: (
+          { key: 'agenda', path: '/sistema/agenda', label: 'Agenda', perfis: ['admin', 'voluntario', 'igreja', 'lider'], icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>
-            </svg>
-          )},
-          { key: 'locais', path: '/sistema/locais', label: 'Locais', perfis: ['admin', 'voluntario'], icon: (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/>
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
             </svg>
           )},
         ].filter(item => temAcessoDinamico(perfilUsuario, item.key)).map(item => {
@@ -4378,7 +4758,7 @@ export default function Dashboard() {
                   <div style={s.dropdownDivider} />
                 </>
               )}
-              <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false); setModalEditarPerfilAberto(true) }}>Editar perfil</button>
+              <button style={s.dropdownItem} onClick={() => { setDropdownOpen(false); setModalEditarPerfilAberto(true); carregarVoluntario() }}>Editar perfil</button>
               <div style={s.dropdownDivider} />
               <button style={{ ...s.dropdownItem, color: '#0f1117' }} onClick={handleSignOut}>Sair</button>
             </div>
@@ -4386,23 +4766,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {modalEditarPerfilAberto && (
-        <div style={s.modalOverlay} onClick={() => setModalEditarPerfilAberto(false)}>
-          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '360px', padding: '32px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#0f1117', marginBottom: '20px' }}>Editar perfil</h3>
-            <div style={{ width: '96px', height: '96px', borderRadius: '50%', margin: '0 auto 18px', overflow: 'hidden', background: '#F97310', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', fontWeight: 800, color: '#fff' }}>
-              {fotoUsuario ? <img src={fotoUsuario} alt="Foto de perfil" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : getInitials(nomeUsuario || user?.email)}
-            </div>
-            <label style={{ ...s.editBtn, background: '#F97310', color: '#fff', display: 'inline-block', cursor: enviandoFotoPerfil ? 'default' : 'pointer', opacity: enviandoFotoPerfil ? 0.6 : 1 }}>
-              {enviandoFotoPerfil ? 'Enviando...' : 'Trocar foto'}
-              <input type="file" accept="image/*" onChange={handleSelecionarFotoPerfil} disabled={enviandoFotoPerfil} style={{ display: 'none' }} />
-            </label>
-            <div style={{ marginTop: '20px' }}>
-              <button style={s.backBtn} onClick={() => setModalEditarPerfilAberto(false)}>Fechar</button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   )
@@ -4663,7 +5026,7 @@ const s = {
     border: 'none',
     borderRadius: '8px',
     padding: '10px 12px',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: 700,
     color: '#374151',
     cursor: 'pointer',
