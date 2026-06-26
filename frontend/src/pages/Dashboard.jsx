@@ -94,6 +94,7 @@ export default function Dashboard() {
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [fotoUsuario, setFotoUsuario] = useState('')
   const [modalEditarPerfilAberto, setModalEditarPerfilAberto] = useState(false)
+  const [modalCadastroIncompleto, setModalCadastroIncompleto] = useState(false)
   const [enviandoFotoPerfil, setEnviandoFotoPerfil] = useState(false)
   const [subMenuFoto, setSubMenuFoto] = useState(false)
   const [editandoNome, setEditandoNome] = useState(false)
@@ -285,6 +286,10 @@ export default function Dashboard() {
         if (menuAtual && !acessoLiberado(data.perfil, menuAtual.key, permData || [])) {
           const primeiro = MENU.find(m => acessoLiberado(data.perfil, m.key, permData || []))
           if (primeiro) navigate(primeiro.path)
+        }
+        if (data.perfil === 'voluntario') {
+          const { data: vol } = await supabase.from('voluntarios').select('*').eq('usuario_id', user.id).maybeSingle()
+          if (vol && camposFaltando(vol).length > 0) setModalCadastroIncompleto(true)
         }
       }
     }
@@ -493,10 +498,19 @@ export default function Dashboard() {
 
   async function carregarEventos() {
     let query = supabase.from('eventos').select('*, locais(nome), equipes(nome)').order('data').order('hora_inicio')
-    if (perfilUsuario !== 'admin' && perfilUsuario !== 'lider' && minhaEquipeId) {
-      query = query.or(`equipe_id.eq.${minhaEquipeId},equipe_id.is.null`)
-    } else if (perfilUsuario !== 'admin' && perfilUsuario !== 'lider' && !minhaEquipeId) {
-      query = query.is('equipe_id', null)
+    const isAdminOuLider = perfilUsuario === 'admin' || perfilUsuario === 'lider'
+    if (!isAdminOuLider && user?.id) {
+      let equipeId = minhaEquipeId
+      if (!equipeId) {
+        const { data: eq } = await supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', user.id).limit(1)
+        equipeId = eq?.[0]?.equipe_id || null
+        if (equipeId) setMinhaEquipeId(equipeId)
+      }
+      if (equipeId) {
+        query = query.or(`equipe_id.eq.${equipeId},equipe_id.is.null`)
+      } else {
+        query = query.is('equipe_id', null)
+      }
     }
     const { data } = await query
     if (data) {
@@ -1264,9 +1278,15 @@ export default function Dashboard() {
     const fimDia = `${dataStr}T23:59:59`
 
     const isAdmin = perfilUsuario === 'admin' || perfilUsuario === 'lider'
+    let equipeIdFiltro = minhaEquipeId
+    if (!isAdmin && user?.id && !equipeIdFiltro) {
+      const { data: eq } = await supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', user.id).limit(1)
+      equipeIdFiltro = eq?.[0]?.equipe_id || null
+      if (equipeIdFiltro) setMinhaEquipeId(equipeIdFiltro)
+    }
     let qEventosHoje = supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').eq('data', dataStr).order('hora_inicio')
-    if (!isAdmin && minhaEquipeId) qEventosHoje = qEventosHoje.or(`equipe_id.eq.${minhaEquipeId},equipe_id.is.null`)
-    else if (!isAdmin && !minhaEquipeId) qEventosHoje = qEventosHoje.is('equipe_id', null)
+    if (!isAdmin && equipeIdFiltro) qEventosHoje = qEventosHoje.or(`equipe_id.eq.${equipeIdFiltro},equipe_id.is.null`)
+    else if (!isAdmin && !equipeIdFiltro) qEventosHoje = qEventosHoje.is('equipe_id', null)
     const [resEventos, resGrupos, resUsuarios, resVol, resEquipes, resAlbum] = await Promise.all([
       qEventosHoje,
       supabase.from('grupos').select('id, nome').ilike('nome', '%geral%').limit(1),
@@ -1301,8 +1321,8 @@ export default function Dashboard() {
 
     if (eventos.length === 0) {
       let qProximos = supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').gt('data', dataStr).order('data').order('hora_inicio').limit(20)
-      if (!isAdmin && minhaEquipeId) qProximos = qProximos.or(`equipe_id.eq.${minhaEquipeId},equipe_id.is.null`)
-      else if (!isAdmin && !minhaEquipeId) qProximos = qProximos.is('equipe_id', null)
+      if (!isAdmin && equipeIdFiltro) qProximos = qProximos.or(`equipe_id.eq.${equipeIdFiltro},equipe_id.is.null`)
+      else if (!isAdmin && !equipeIdFiltro) qProximos = qProximos.is('equipe_id', null)
       const { data: proximos } = await qProximos
       if (proximos && proximos.length > 0) {
         proximaDataAgenda = proximos[0].data
@@ -1346,6 +1366,7 @@ export default function Dashboard() {
         faz_filmagens: data.faz_filmagens || false, outras_competencias: data.outras_competencias || false,
         outra_competencia_descricao: data.outra_competencia_descricao || '', sexo: data.sexo || '',
       })
+      if (camposFaltando(data).length > 0) setModalCadastroIncompleto(true)
     }
     setCarregandoVoluntario(false)
   }
@@ -1439,6 +1460,31 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Modal cadastro incompleto */}
+      {modalCadastroIncompleto && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ background: '#fff', borderRadius: '20px', maxWidth: '400px', width: '100%', padding: '32px', textAlign: 'center', boxShadow: '0 16px 64px rgba(0,0,0,0.3)' }}>
+            <div style={{ width: '56px', height: '56px', background: '#fff4ec', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#F97310" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <h2 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '10px' }}>Cadastro incompleto</h2>
+            <p style={{ fontSize: '14px', color: '#6b7280', lineHeight: 1.7, marginBottom: '24px' }}>
+              Seu cadastro de voluntário ainda não está completo. Deseja preencher agora?
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setModalCadastroIncompleto(false)}
+                style={{ flex: 1, padding: '12px', borderRadius: '50px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                Deixar para depois
+              </button>
+              <button onClick={() => { setModalCadastroIncompleto(false); setModalEditarPerfilAberto(true); carregarVoluntario() }}
+                style={{ flex: 1, padding: '12px', borderRadius: '50px', border: 'none', background: '#F97310', color: '#fff', fontWeight: 800, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.5px' }}>
+                Completar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal expandir anúncio */}
       {expandirAnuncio !== null && painelCruzada.fotosAnuncios.length > 0 && (() => {
         const fotos = painelCruzada.fotosAnuncios
@@ -1508,7 +1554,7 @@ export default function Dashboard() {
                       </div>
                       {perfilUsuario === 'admin' && (
                         <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-                          <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null); setModalEvento({ tipo: 'editar', evento: ev }); const d = ev.data; setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', organizacaoId: ev.organizacaoId || null }) }}>Editar</button>
+                          <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null); setModalEvento({ tipo: 'editar', evento: ev }); const d = ev.data; setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', organizacaoId: ev.organizacaoId || null, equipesSelecionadas: ev.equipeId ? [{ id: ev.equipeId, nome: ev.equipe, cor: equipes.find(e => e.id === ev.equipeId)?.cor }] : [] }) }}>Editar</button>
                           <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => { if (window.confirm(`Excluir "${ev.titulo}"?`)) { /* excluirEvento handled outside */ } }}>Excluir</button>
                         </div>
                       )}
@@ -3652,51 +3698,67 @@ export default function Dashboard() {
                               <label style={s.fieldLabel}>Data</label>
                               <input type="date" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEditEvento.data} onChange={e => setFormEditEvento(f => ({ ...f, data: e.target.value }))} />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', minWidth: 0 }}>
-                              <div style={{ minWidth: 0 }}>
-                                <label style={s.fieldLabel}>Início</label>
-                                <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEditEvento.horaInicio} onChange={e => setFormEditEvento(f => ({ ...f, horaInicio: e.target.value }))} />
-                              </div>
-                              <div style={{ minWidth: 0 }}>
-                                <label style={s.fieldLabel}>Fim</label>
-                                <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEditEvento.horaFim} onChange={e => setFormEditEvento(f => ({ ...f, horaFim: e.target.value }))} />
-                              </div>
+                            <div>
+                              <label style={s.fieldLabel}>Início</label>
+                              <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEditEvento.horaInicio} onChange={e => setFormEditEvento(f => ({ ...f, horaInicio: e.target.value }))} />
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                              <div style={{ position: 'relative' }}>
-                                <label style={s.fieldLabel}>Local</label>
-                                <input style={s.inputEdit} value={formEditEvento.local || ''} onChange={e => setFormEditEvento(f => ({ ...f, local: e.target.value, localId: null }))} placeholder="Pesquisar local..." autoComplete="off" />
-                                {(formEditEvento.local || '').length > 0 && !formEditEvento.localId && locais.filter(l => l.nome.toLowerCase().includes((formEditEvento.local || '').toLowerCase()) || l.bairro?.toLowerCase().includes((formEditEvento.local || '').toLowerCase())).length > 0 && (
-                                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
-                                    {locais.filter(l => l.nome.toLowerCase().includes((formEditEvento.local || '').toLowerCase()) || l.bairro?.toLowerCase().includes((formEditEvento.local || '').toLowerCase())).slice(0, 8).map(l => (
-                                      <div key={l.id}
-                                        style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
-                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                                        onClick={() => setFormEditEvento(f => ({ ...f, local: l.nome, localId: l.id }))}>
-                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
+                            <div>
+                              <label style={s.fieldLabel}>Fim</label>
+                              <input type="time" style={{ ...s.inputEdit, width: '100%', boxSizing: 'border-box' }} value={formEditEvento.horaFim} onChange={e => setFormEditEvento(f => ({ ...f, horaFim: e.target.value }))} />
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                              <label style={s.fieldLabel}>Local</label>
+                              <input style={s.inputEdit} value={formEditEvento.local || ''} onChange={e => setFormEditEvento(f => ({ ...f, local: e.target.value, localId: null }))} placeholder="Pesquisar local..." autoComplete="off" />
+                              {(formEditEvento.local || '').length > 0 && !formEditEvento.localId && locais.filter(l => l.nome.toLowerCase().includes((formEditEvento.local || '').toLowerCase())).length > 0 && (
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
+                                  {locais.filter(l => l.nome.toLowerCase().includes((formEditEvento.local || '').toLowerCase())).slice(0, 8).map(l => (
+                                    <div key={l.id} style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
+                                      onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                      onMouseLeave={e => e.currentTarget.style.background = '#fff'}
+                                      onClick={() => setFormEditEvento(f => ({ ...f, local: l.nome, localId: l.id }))}>
+                                      <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{l.nome}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            {/* Equipes - dropdown multi-select */}
+                            <div style={{ position: 'relative' }}>
+                              <label style={s.fieldLabel}>Equipes</label>
+                              <div onClick={() => setDropEquipe(d => !d)}
+                                style={{ ...s.inputEdit, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', minHeight: '42px' }}>
+                                {(formEditEvento.equipesSelecionadas || []).length === 0
+                                  ? <span style={{ color: '#9ca3af', fontSize: '14px' }}>Selecionar equipes...</span>
+                                  : (formEditEvento.equipesSelecionadas || []).map(e => (
+                                      <span key={e.id} title={e.nome} style={{ width: '20px', height: '20px', borderRadius: '50%', background: e.cor || '#ccc', display: 'inline-block', border: '2px solid #fff', boxShadow: '0 0 0 1.5px rgba(0,0,0,0.15)', flexShrink: 0 }} />
+                                    ))
+                                }
+                                <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#9ca3af' }}>{dropEquipe ? '▲' : '▼'}</span>
                               </div>
-                              <div style={{ position: 'relative' }}>
-                                <label style={s.fieldLabel}>Equipe</label>
-                                <input style={s.inputEdit} value={formEditEvento.equipe || ''} onChange={e => setFormEditEvento(f => ({ ...f, equipe: e.target.value, equipeId: null }))} placeholder="Pesquisar equipe..." autoComplete="off" />
-                                {(formEditEvento.equipe || '').length > 0 && !formEditEvento.equipeId && equipes.filter(o => o.nome.toLowerCase().includes((formEditEvento.equipe || '').toLowerCase())).length > 0 && (
-                                  <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', zIndex: 10, overflow: 'hidden' }}>
-                                    {equipes.filter(o => o.nome.toLowerCase().includes((formEditEvento.equipe || '').toLowerCase())).slice(0, 8).map(o => (
-                                      <div key={o.id}
-                                        style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', background: '#fff', cursor: 'pointer' }}
-                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
-                                        onMouseLeave={e => e.currentTarget.style.background = '#fff'}
-                                        onClick={() => setFormEditEvento(f => ({ ...f, equipe: o.nome, equipeId: o.id }))}>
-                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }}>{o.nome}</div>
-                                      </div>
-                                    ))}
+                              {dropEquipe && (
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 20, overflow: 'hidden' }}>
+                                  <div onClick={() => { setFormEditEvento(f => ({ ...f, equipesSelecionadas: [] })); setDropEquipe(false) }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: '#fafafa' }}>
+                                    <span style={{ fontSize: '14px', color: '#9ca3af', fontStyle: 'italic' }}>Nenhuma</span>
                                   </div>
-                                )}
-                              </div>
+                                  {equipes.map(o => {
+                                    const sel = (formEditEvento.equipesSelecionadas || []).some(e => e.id === o.id)
+                                    return (
+                                      <div key={o.id} onClick={() => setFormEditEvento(f => {
+                                        const lista = f.equipesSelecionadas || []
+                                        return { ...f, equipesSelecionadas: sel ? lista.filter(e => e.id !== o.id) : [...lista, { id: o.id, nome: o.nome, cor: o.cor }] }
+                                      })}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: sel ? '#fff8f3' : '#fff' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                                        onMouseLeave={e => e.currentTarget.style.background = sel ? '#fff8f3' : '#fff'}>
+                                        <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: o.cor || '#ccc', flexShrink: 0, border: '2px solid #e5e7eb' }} />
+                                        <span style={{ fontSize: '14px', fontWeight: sel ? 700 : 400, color: '#0f1117', flex: 1 }}>{o.nome}</span>
+                                        {sel && <span style={{ color: '#F97310', fontWeight: 700, fontSize: '16px' }}>✓</span>}
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
                             </div>
                             <div>
                               <label style={s.fieldLabel}>Descrição</label>
@@ -3723,7 +3785,7 @@ export default function Dashboard() {
                                   cor: formEditEvento.cor,
                                   descricao: formEditEvento.descricao || null,
                                   local_id: formEditEvento.localId || null,
-                                  equipe_id: formEditEvento.equipeId || null,
+                                  equipe_id: formEditEvento.equipesSelecionadas?.length === 1 ? formEditEvento.equipesSelecionadas[0].id : (formEditEvento.equipeId || null),
                                 }
                                 const { error } = await supabase.from('eventos').update(payload).eq('id', modalEvento.evento.id)
                                 if (!error) {
@@ -3793,7 +3855,7 @@ export default function Dashboard() {
                               <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => {
                                 const ev = modalEvento.evento
                                 const d = ev.data
-                                setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', equipeId: ev.equipeId || null })
+                                setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', equipeId: ev.equipeId || null, equipesSelecionadas: ev.equipeId ? [{ id: ev.equipeId, nome: ev.equipe, cor: equipes.find(e => e.id === ev.equipeId)?.cor }] : [] })
                                 setModalEvento({ tipo: 'editar', evento: ev })
                               }}>Editar</button>
                               <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => setConfirmarExclusao(true)}>Excluir</button>
