@@ -101,6 +101,7 @@ export default function Dashboard() {
   const [salvandoNome, setSalvandoNome] = useState(false)
   const [cropSrc, setCropSrc] = useState(null)
   const [expandirFoto, setExpandirFoto] = useState(false)
+  const [expandirAnuncio, setExpandirAnuncio] = useState(null)
   const [crop, setCrop] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
@@ -115,6 +116,7 @@ export default function Dashboard() {
   const [permissoesOriginais, setPermissoesOriginais] = useState(null)
   const [salvandoPermissoes, setSalvandoPermissoes] = useState(false)
   const [minhaEquipe, setMinhaEquipe] = useState(null)
+  const [minhaEquipeId, setMinhaEquipeId] = useState(null)
   const [meusGrupos, setMeusGrupos] = useState([])
   const [editandoStatus, setEditandoStatus] = useState(false)
   const [alertaCampos, setAlertaCampos] = useState(null)
@@ -269,8 +271,9 @@ export default function Dashboard() {
       const { data: permData } = await supabase.from('permissoes').select('*')
       setPermissoes(permData || [])
       setPermissoesOriginais(permData || [])
-      const { data: minhaEquipeData } = await supabase.from('usuario_equipes').select('equipes(nome, cor)').eq('usuario_id', user?.id).limit(1)
+      const { data: minhaEquipeData } = await supabase.from('usuario_equipes').select('equipe_id, equipes(nome, cor)').eq('usuario_id', user?.id).limit(1)
       setMinhaEquipe(minhaEquipeData?.[0]?.equipes || null)
+      setMinhaEquipeId(minhaEquipeData?.[0]?.equipe_id || null)
       const { data: gruposData } = await supabase.from('usuario_grupos').select('grupos(nome)').eq('usuario_id', user?.id)
       setMeusGrupos((gruposData || []).map(r => r.grupos?.nome).filter(Boolean))
       if (data?.nome) setNomeUsuario(data.nome)
@@ -388,7 +391,7 @@ export default function Dashboard() {
     if (menu === 'pessoas') { carregarPessoasKanban() }
     if (menu === 'mapa') carregarAbordagensComTotal()
     if (menu === 'galeria') { carregarAlbuns(); carregarVideosGaleria(); verificarGrupoMidia() }
-  }, [menu])
+  }, [menu, minhaEquipeId])
 
   useEffect(() => {
     if (isNovaAbordagemPage) {
@@ -488,7 +491,13 @@ export default function Dashboard() {
   }, [modalPessoa?.observacao_2])
 
   async function carregarEventos() {
-    const { data } = await supabase.from('eventos').select('*, locais(nome), equipes(nome)').order('data').order('hora_inicio')
+    let query = supabase.from('eventos').select('*, locais(nome), equipes(nome)').order('data').order('hora_inicio')
+    if (perfilUsuario !== 'admin' && perfilUsuario !== 'lider' && minhaEquipeId) {
+      query = query.or(`equipe_id.eq.${minhaEquipeId},equipe_id.is.null`)
+    } else if (perfilUsuario !== 'admin' && perfilUsuario !== 'lider' && !minhaEquipeId) {
+      query = query.is('equipe_id', null)
+    }
+    const { data } = await query
     if (data) {
       setAgendaEventos(data.map(e => ({
         id: e.id,
@@ -1253,8 +1262,12 @@ export default function Dashboard() {
     const meiodia = `${dataStr}T12:00:00`
     const fimDia = `${dataStr}T23:59:59`
 
+    const isAdmin = perfilUsuario === 'admin' || perfilUsuario === 'lider'
+    let qEventosHoje = supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').eq('data', dataStr).order('hora_inicio')
+    if (!isAdmin && minhaEquipeId) qEventosHoje = qEventosHoje.or(`equipe_id.eq.${minhaEquipeId},equipe_id.is.null`)
+    else if (!isAdmin && !minhaEquipeId) qEventosHoje = qEventosHoje.is('equipe_id', null)
     const [resEventos, resGrupos, resUsuarios, resVol, resEquipes, resAlbum] = await Promise.all([
-      supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').eq('data', dataStr).order('hora_inicio'),
+      qEventosHoje,
       supabase.from('grupos').select('id, nome').ilike('nome', '%geral%').limit(1),
       supabase.from('usuarios').select('id', { count: 'exact', head: true }).eq('ativo', true),
       supabase.from('voluntarios').select('id, nome_completo, idade, whatsapp, instagram, cidade_estado_pais, igreja, nome_pastor, contato_pastor_lider, como_serve_igreja, tempo_na_igreja, estado_civil, conjuge_na_missao, motivo_conjuge_ausente, ja_participou_missao, nome_emergencia, telefone_emergencia').not('usuario_id', 'is', null),
@@ -1286,13 +1299,10 @@ export default function Dashboard() {
     let proximaDataAgenda = null
 
     if (eventos.length === 0) {
-      const { data: proximos } = await supabase
-        .from('eventos')
-        .select('id, titulo, data, hora_inicio, locais(nome)')
-        .gt('data', dataStr)
-        .order('data')
-        .order('hora_inicio')
-        .limit(20)
+      let qProximos = supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').gt('data', dataStr).order('data').order('hora_inicio').limit(20)
+      if (!isAdmin && minhaEquipeId) qProximos = qProximos.or(`equipe_id.eq.${minhaEquipeId},equipe_id.is.null`)
+      else if (!isAdmin && !minhaEquipeId) qProximos = qProximos.is('equipe_id', null)
+      const { data: proximos } = await qProximos
       if (proximos && proximos.length > 0) {
         proximaDataAgenda = proximos[0].data
         const eventosProximos = proximos.filter(e => e.data === proximaDataAgenda)
@@ -1428,6 +1438,45 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Modal expandir anúncio */}
+      {expandirAnuncio !== null && painelCruzada.fotosAnuncios.length > 0 && (() => {
+        const fotos = painelCruzada.fotosAnuncios
+        const idxModal = expandirAnuncio % fotos.length
+        const prev = () => setExpandirAnuncio(i => (i - 1 + fotos.length) % fotos.length)
+        const next = () => setExpandirAnuncio(i => (i + 1) % fotos.length)
+        let touchStartX = null
+        return (
+          <div
+            onClick={() => setExpandirAnuncio(null)}
+            onTouchStart={e => { touchStartX = e.touches[0].clientX }}
+            onTouchEnd={e => {
+              if (touchStartX === null) return
+              const diff = touchStartX - e.changedTouches[0].clientX
+              if (diff > 50) next()
+              else if (diff < -50) prev()
+              touchStartX = null
+            }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)', zIndex: 3000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Fechar */}
+            <button onClick={() => setExpandirAnuncio(null)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', color: '#fff', fontSize: '18px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>✕</button>
+            {/* Imagem principal */}
+            <div onClick={e => e.stopPropagation()} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '16px', position: 'relative', boxSizing: 'border-box' }}>
+              {/* Setas - só desktop */}
+              <button className="lightbox-arrow" onClick={e => { e.stopPropagation(); prev() }} style={{ position: 'absolute', left: '16px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '48px', height: '48px', color: '#fff', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>‹</button>
+              <img src={fotos[idxModal].url} alt="Anúncio" style={{ maxWidth: '100%', maxHeight: 'calc(100vh - 160px)', borderRadius: '10px', objectFit: 'contain' }} />
+              <button className="lightbox-arrow" onClick={e => { e.stopPropagation(); next() }} style={{ position: 'absolute', right: '16px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '48px', height: '48px', color: '#fff', fontSize: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>›</button>
+            </div>
+            {/* Miniaturas */}
+            <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '8px', padding: '12px 16px', overflowX: 'auto', maxWidth: '100%', boxSizing: 'border-box' }}>
+              {fotos.map((f, i) => (
+                <img key={i} src={f.url} alt="" onClick={e => { e.stopPropagation(); setExpandirAnuncio(i) }}
+                  style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', border: i === idxModal ? '2px solid #F97310' : '2px solid transparent', opacity: i === idxModal ? 1 : 0.5, flexShrink: 0, transition: 'all 0.2s' }} />
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Modal lista do dia - agenda */}
       {agendaDiaModal && (
         <div style={s.modalOverlay} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null) }}>
@@ -1517,7 +1566,11 @@ export default function Dashboard() {
 
       <style>{`
         .grupo-chat-input::placeholder { color: #9ca3af !important; opacity: 1 !important; }
+        .carrossel-container { aspect-ratio: 16/6; max-height: 220px; }
+        .lightbox-arrow { display: flex !important; }
         @media (max-width: 768px) {
+          .carrossel-container { aspect-ratio: 16/9 !important; max-height: none !important; }
+          .lightbox-arrow { display: none !important; }
           .agenda-mobile { display: block !important; }
           .agenda-desktop { display: none !important; }
           .dash-sidebar { display: none !important; }
@@ -1899,8 +1952,8 @@ export default function Dashboard() {
                   clearTimeout(carrosselTimer.current)
                   carrosselTimer.current = setTimeout(() => setCarrosselIdx(i => i + 1), 12000)
                   return (
-                    <div style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', background: '#0f1117', aspectRatio: '16/6', maxHeight: '220px' }}>
-                      <img src={fotosAnuncios[idx].url} alt="Anúncio" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    <div className="carrossel-container" style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', background: '#0f1117' }}>
+                      <img src={fotosAnuncios[idx].url} alt="Anúncio" onClick={() => setExpandirAnuncio(idx)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }} />
                       <div style={{ position: 'absolute', bottom: '10px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '6px' }}>
                         {fotosAnuncios.map((_, i) => (
                           <button key={i} onClick={() => setCarrosselIdx(i)} style={{ width: i === idx ? '20px' : '8px', height: '8px', borderRadius: '999px', background: i === idx ? '#F97310' : 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s' }} />
