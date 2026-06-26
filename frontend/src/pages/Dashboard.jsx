@@ -1659,7 +1659,7 @@ export default function Dashboard() {
       {/* Header */}
       <div style={s.header} className="dash-header">
         <div style={{ ...s.headerLogo, cursor: 'pointer' }} className="dash-header-logo" onClick={() => navigate('/sistema/cruzada')}>
-          <img src="/icon-512.png" alt="Logo" style={{ height: '22px', width: 'auto' }} />
+          <img src="/logo.png" alt="Logo" style={{ height: '22px', width: 'auto' }} />
           <span style={s.headerTitle} className="dash-header-title">Cruzada <span style={{ color: '#F97310' }}>Ibirité</span></span>
         </div>
         <div style={{ position: 'relative' }} className="dash-profile-btn">
