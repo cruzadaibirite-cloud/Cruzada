@@ -146,7 +146,7 @@ export default function Home() {
         .nav-links a:hover, .nav-links a.active { color: var(--orange); border-bottom-color: var(--orange); }
         .nav-right { display: flex; align-items: center; gap: 20px; }
         .nav-date { font-size: 12px; color: var(--orange); font-weight: 700; letter-spacing: 1px; }
-        .btn-nav { background: transparent; color: var(--orange); padding: 11px 28px; font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; text-decoration: none; transition: all .2s; white-space: nowrap; border-radius: 50px; cursor: pointer; border: none; font-family: inherit; }
+        .btn-nav { background: transparent; color: var(--orange); padding: 11px 28px; font-size: 15px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; text-decoration: none; transition: all .2s; white-space: nowrap; border-radius: 50px; cursor: pointer; border: none; font-family: inherit; }
         .btn-nav:hover { color: var(--orange2); }
         .hero { background: var(--dark); min-height: 100dvh; position: relative; overflow: hidden; display: flex; align-items: center; padding-top: 75px; }
         .hero-map { position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 30% 50%, rgba(249,115,22,.06) 0%, transparent 60%), url('/f1.jpg') center/cover no-repeat; filter: brightness(.12) saturate(.2); }
