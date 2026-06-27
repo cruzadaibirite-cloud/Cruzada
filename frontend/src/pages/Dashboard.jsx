@@ -121,7 +121,7 @@ export default function Dashboard() {
   const [meusGrupos, setMeusGrupos] = useState([])
   const [editandoStatus, setEditandoStatus] = useState(false)
   const [alertaCampos, setAlertaCampos] = useState(null)
-  const [painelCruzada, setPainelCruzada] = useState({ eventosManha: [], eventosTarde: [], comunicados: [], equipes: [], totalUsuarios: 0, totalVoluntarios: 0, totalCompletos: 0, fotosAnuncios: [], proximaDataAgenda: null })
+  const [painelCruzada, setPainelCruzada] = useState({ eventosManha: [], eventosTarde: [], proximosEventos: [], comunicados: [], equipes: [], totalUsuarios: 0, totalVoluntarios: 0, totalCompletos: 0, fotosAnuncios: [], proximaDataAgenda: null })
   const [carrosselIdx, setCarrosselIdx] = useState(0)
   const carrosselTimer = useRef(null)
   const [editando, setEditando] = useState(false)
@@ -1328,26 +1328,21 @@ export default function Dashboard() {
       comunicados = msgs || []
     }
 
-    let eventosManha = eventos.filter(e => (e.hora_inicio || '00:00') < '12:00')
-    let eventosTarde = eventos.filter(e => (e.hora_inicio || '00:00') >= '12:00')
+    let proximosEventos = []
     let proximaDataAgenda = null
 
-    if (eventos.length === 0) {
-      let qProximos = supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').gt('data', dataStr).order('data').order('hora_inicio').limit(20)
-      if (!isAdmin && equipeIdFiltro) qProximos = qProximos.or(`equipe_id.eq.${equipeIdFiltro},equipe_id.is.null`)
-      else if (!isAdmin && !equipeIdFiltro) qProximos = qProximos.is('equipe_id', null)
-      const { data: proximos } = await qProximos
-      if (proximos && proximos.length > 0) {
-        proximaDataAgenda = proximos[0].data
-        const eventosProximos = proximos.filter(e => e.data === proximaDataAgenda)
-        eventosManha = eventosProximos.filter(e => (e.hora_inicio || '00:00') < '12:00')
-        eventosTarde = eventosProximos.filter(e => (e.hora_inicio || '00:00') >= '12:00')
-      }
-    }
+    const horaAtual = new Date().toTimeString().slice(0, 5)
+    let qProximos = supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').gte('data', dataStr).order('data').order('hora_inicio').limit(30)
+    if (!isAdmin && equipeIdFiltro) qProximos = qProximos.or(`equipe_id.eq.${equipeIdFiltro},equipe_id.is.null`)
+    else if (!isAdmin && !equipeIdFiltro) qProximos = qProximos.is('equipe_id', null)
+    const { data: proximos } = await qProximos
+    proximosEventos = (proximos || []).filter(e => e.data > dataStr || (e.data === dataStr && (e.hora_inicio || '00:00') >= horaAtual)).slice(0, 7)
+    if (proximosEventos.length > 0) proximaDataAgenda = proximosEventos[0].data
 
     setPainelCruzada({
-      eventosManha,
-      eventosTarde,
+      proximosEventos,
+      eventosManha: [],
+      eventosTarde: [],
       comunicados,
       equipes,
       totalUsuarios: totalUsuariosData,
@@ -2028,15 +2023,25 @@ export default function Dashboard() {
 
                 {/* Próximas Ações */}
                 <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px' }}>
-                  <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>
-                    {painelCruzada.proximaDataAgenda
-                      ? `Próxima agenda — ${new Date(painelCruzada.proximaDataAgenda + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}`
-                      : 'Agenda de Hoje'}
-                  </p>
-                  {[...eventosManha, ...eventosTarde].length === 0
+                  <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Próximos eventos</p>
+                  {painelCruzada.proximosEventos.length === 0
                     ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum evento cadastrado</div>
-                    : <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>{[...eventosManha, ...eventosTarde].map(ev => <EventoCard key={ev.id} ev={ev} />)}</div>
+                    : <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {painelCruzada.proximosEventos.map(ev => (
+                          <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
+                            <div style={{ minWidth: '48px', textAlign: 'center' }}>
+                              <div style={{ fontSize: '11px', fontWeight: 800, color: '#F97310' }}>{new Date(ev.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</div>
+                              {ev.hora_inicio && <div style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600 }}>{ev.hora_inicio.slice(0,5)}</div>}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f1117' }}>{ev.titulo}</div>
+                              {ev.locais?.nome && <div style={{ fontSize: '11px', color: '#9ca3af' }}>{ev.locais.nome}</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                   }
+                  <button onClick={() => navigate('/sistema/agenda')} style={{ marginTop: '14px', width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #F97310', background: 'none', color: '#F97310', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>Ver agenda completa</button>
                 </div>
 
                 {/* Comunicados */}
@@ -2046,11 +2051,14 @@ export default function Dashboard() {
                     ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum comunicado</div>
                     : comunicados.slice(-3).reverse().map((c, i) => (
                       <div key={i} style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: '10px', marginBottom: '10px' }}>
-                        <div style={{ fontSize: '13px', color: '#374151', fontWeight: 600 }}>{c.mensagem}</div>
+                        <div style={{ fontSize: '13px', color: '#374151', fontWeight: 600, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.mensagem}</div>
                         <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>{c.usuarios?.nome}</div>
                       </div>
                     ))
                   }
+                  {grupos.find(g => g.nome === 'Geral') && (
+                    <button onClick={() => navigate(`/sistema/grupos/${grupos.find(g => g.nome === 'Geral').id}`)} style={{ marginTop: '14px', width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #F97310', background: 'none', color: '#F97310', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>Abrir Grupo Geral</button>
+                  )}
                 </div>
 
                 {/* Progresso */}
