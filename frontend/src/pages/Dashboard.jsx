@@ -2695,8 +2695,10 @@ export default function Dashboard() {
                 const idx = fotosAlbum.findIndex(f => f.id === fotoAmpliada.id)
                 const ir = (delta) => { const novo = fotosAlbum[idx + delta]; if (novo) setFotoAmpliada(novo) }
                 return (
-                  <div style={{ ...s.modalOverlay, background: 'rgba(0,0,0,0.9)', top: isMobile() ? '64px' : 0 }} onClick={() => setFotoAmpliada(null)}
-                    onKeyDown={e => { if (e.key === 'ArrowLeft') ir(-1); if (e.key === 'ArrowRight') ir(1); if (e.key === 'Escape') setFotoAmpliada(null) }} tabIndex={0} ref={el => el?.focus()}>
+                  <div style={{ ...s.modalOverlay, background: 'rgba(0,0,0,0.9)', top: isMobile() ? '64px' : 0, touchAction: 'none' }} onClick={() => setFotoAmpliada(null)}
+                    onKeyDown={e => { if (e.key === 'ArrowLeft') ir(-1); if (e.key === 'ArrowRight') ir(1); if (e.key === 'Escape') setFotoAmpliada(null) }} tabIndex={0} ref={el => el?.focus()}
+                    onTouchStart={e => { e.stopPropagation(); e._touchStartX = e.touches[0].clientX }}
+                    onTouchEnd={e => { e.stopPropagation(); const dx = e.changedTouches[0].clientX - e._touchStartX; if (dx > 50) ir(-1); else if (dx < -50) ir(1) }}>
                     <button onClick={async e => { e.stopPropagation(); const path = fotoAmpliada.url.split('/galeria/')[1]; const { data } = await supabase.storage.from('galeria').download(path); if (data) { const a = document.createElement('a'); a.href = URL.createObjectURL(data); a.download = fotoAmpliada.nome || 'foto.jpg'; a.click(); URL.revokeObjectURL(a.href) } }} style={{ position: 'fixed', top: isMobile() ? '72px' : '16px', right: '60px', background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </button>
