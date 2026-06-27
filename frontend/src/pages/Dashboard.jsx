@@ -3894,7 +3894,7 @@ export default function Dashboard() {
                                 <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#9ca3af' }}>{dropEquipe ? '▲' : '▼'}</span>
                               </div>
                               {dropEquipe && (
-                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 20, overflow: 'hidden' }}>
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 20, overflow: 'hidden', maxHeight: '220px', overflowY: 'auto' }}>
                                   <div onClick={() => { setFormEvento(f => ({ ...f, equipesSelecionadas: [] })); setDropEquipe(false) }}
                                     style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: '#fafafa' }}>
                                     <span style={{ fontSize: '14px', color: '#9ca3af', fontStyle: 'italic' }}>Nenhuma</span>
@@ -3987,7 +3987,7 @@ export default function Dashboard() {
                                 <span style={{ marginLeft: 'auto', fontSize: '12px', color: '#9ca3af' }}>{dropEquipe ? '▲' : '▼'}</span>
                               </div>
                               {dropEquipe && (
-                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 20, overflow: 'hidden' }}>
+                                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', borderRadius: '12px', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 20, overflow: 'hidden', maxHeight: '220px', overflowY: 'auto' }}>
                                   <div onClick={() => { setFormEditEvento(f => ({ ...f, equipesSelecionadas: [] })); setDropEquipe(false) }}
                                     style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', background: '#fafafa' }}>
                                     <span style={{ fontSize: '14px', color: '#9ca3af', fontStyle: 'italic' }}>Nenhuma</span>
