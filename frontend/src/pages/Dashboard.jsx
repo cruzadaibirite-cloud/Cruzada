@@ -539,7 +539,12 @@ export default function Dashboard() {
 
   async function carregarGrupos() {
     const { data } = await supabase.from('grupos').select('*').order('nome')
-    setGrupos(data || [])
+    const sorted = (data || []).sort((a, b) => {
+      if (a.nome === 'Geral') return -1
+      if (b.nome === 'Geral') return 1
+      return a.nome.localeCompare(b.nome, 'pt')
+    })
+    setGrupos(sorted)
   }
 
   async function carregarOrganizacoes() {
