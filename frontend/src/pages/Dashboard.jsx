@@ -185,6 +185,7 @@ export default function Dashboard() {
   const [enviandoMensagem, setEnviandoMensagem] = useState(false)
   const [papelNoGrupo, setPapelNoGrupo] = useState(null)
   const chatEndRef = useRef(null)
+  const chatInputRef = useRef(null)
   const [menuGrupoAberto, setMenuGrupoAberto] = useState(false)
   const [modalEditarGrupo, setModalEditarGrupo] = useState(false)
   const [nomeEditarGrupo, setNomeEditarGrupo] = useState('')
@@ -2164,15 +2165,20 @@ export default function Dashboard() {
               {papelNoGrupo === 'admin' ? (
                 <div style={{ display: 'flex', marginTop: '12px', border: '1.5px solid #e5e7eb', borderRadius: '12px', overflow: 'hidden', background: '#fff', alignItems: 'flex-end' }}>
                   <textarea
+                    ref={chatInputRef}
                     value={novaMensagem}
-                    onChange={e => setNovaMensagem(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && e.ctrlKey) { e.preventDefault(); enviarMensagem() } }}
+                    onChange={e => {
+                      setNovaMensagem(e.target.value)
+                      const el = chatInputRef.current
+                      if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px' }
+                    }}
+                    onKeyDown={e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); enviarMensagem() } }}
                     placeholder="Digite uma mensagem..."
                     className="grupo-chat-input"
                     rows={1}
-                    style={{ flex: 1, padding: '12px 16px', border: 'none', fontSize: '14px', fontFamily: 'inherit', outline: 'none', color: '#0f1117', background: 'transparent', opacity: 1, resize: 'none', maxHeight: '120px', overflowY: 'auto', lineHeight: '1.5' }}
+                    style={{ flex: 1, padding: '12px 16px', border: 'none', fontSize: '14px', fontFamily: 'inherit', outline: 'none', color: '#0f1117', background: 'transparent', opacity: 1, resize: 'none', overflowY: 'auto', lineHeight: '1.5', minHeight: '46px', maxHeight: '160px' }}
                   />
-                  <button onClick={enviarMensagem} disabled={enviandoMensagem || !novaMensagem.trim()} style={{ background: '#F97310', border: 'none', borderRadius: '0', width: '46px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, opacity: 1 }}>
+                  <button onClick={() => { enviarMensagem(); if (chatInputRef.current) { chatInputRef.current.style.height = 'auto' } }} disabled={enviandoMensagem || !novaMensagem.trim()} style={{ background: '#F97310', border: 'none', borderRadius: '0', width: '46px', minHeight: '46px', alignSelf: 'flex-end', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, opacity: 1 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   </button>
                 </div>
