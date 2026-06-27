@@ -539,7 +539,14 @@ export default function Dashboard() {
 
   async function carregarGrupos() {
     const { data } = await supabase.from('grupos').select('*').order('nome')
-    const sorted = (data || []).sort((a, b) => {
+    const isAdmin = perfilUsuario === 'admin'
+    let lista = data || []
+    if (!isAdmin) {
+      const { data: meus } = await supabase.from('usuario_grupos').select('grupo_id').eq('usuario_id', user.id)
+      const meusIds = (meus || []).map(r => r.grupo_id)
+      lista = lista.filter(g => g.nome === 'Geral' || meusIds.includes(g.id))
+    }
+    const sorted = lista.sort((a, b) => {
       if (a.nome === 'Geral') return -1
       if (b.nome === 'Geral') return 1
       return a.nome.localeCompare(b.nome, 'pt')
