@@ -209,6 +209,12 @@ export default function Dashboard() {
   const [formNovoVideo, setFormNovoVideo] = useState({ titulo: '', link: '' })
   const [videoGaleriaAtivo, setVideoGaleriaAtivo] = useState(null)
   const [podeGerenciarGaleria, setPodeGerenciarGaleria] = useState(false)
+  const [fotosSelecionadas, setFotosSelecionadas] = useState([])
+  const [confirmExcluirFotos, setConfirmExcluirFotos] = useState(false)
+  const [modalMoverFotos, setModalMoverFotos] = useState(false)
+  const [albumDestinoNav, setAlbumDestinoNav] = useState(null)
+  const [albumDestinoFilhos, setAlbumDestinoFilhos] = useState([])
+  const [albumDestinoBread, setAlbumDestinoBread] = useState([])
   const [confirmExcluirAlbum, setConfirmExcluirAlbum] = useState(null)
   const [msgMenuAberto, setMsgMenuAberto] = useState(null)
   const [msgMenuPos, setMsgMenuPos] = useState({ x: 0, y: 0 })
@@ -948,6 +954,41 @@ export default function Dashboard() {
     await supabase.storage.from('galeria').remove([path])
     await supabase.from('fotos').delete().eq('id', foto.id)
     setFotosAlbum(prev => prev.filter(f => f.id !== foto.id))
+  }
+
+  async function excluirFotosSelecionadas() {
+    for (const foto of fotosSelecionadas) {
+      const path = foto.url.split('/galeria/')[1]
+      await supabase.storage.from('galeria').remove([path])
+      await supabase.from('fotos').delete().eq('id', foto.id)
+    }
+    setFotosAlbum(prev => prev.filter(f => !fotosSelecionadas.some(s => s.id === f.id)))
+    setFotosSelecionadas([])
+    setConfirmExcluirFotos(false)
+  }
+
+  async function moverFotosSelecionadas(albumDestinoId) {
+    const ids = fotosSelecionadas.map(f => f.id)
+    await supabase.from('fotos').update({ album_id: albumDestinoId }).in('id', ids)
+    setFotosAlbum(prev => prev.filter(f => !ids.includes(f.id)))
+    setFotosSelecionadas([])
+    setModalMoverFotos(false)
+    setAlbumDestinoNav(null)
+    setAlbumDestinoFilhos([])
+    setAlbumDestinoBread([])
+  }
+
+  async function carregarFilhosDestino(parentId) {
+    const { data } = await supabase.from('albuns').select('*').eq('parent_id', parentId).order('nome')
+    setAlbumDestinoFilhos(data || [])
+  }
+
+  async function abrirModalMover() {
+    const { data } = await supabase.from('albuns').select('*').is('parent_id', null).order('nome')
+    setAlbumDestinoFilhos(data || [])
+    setAlbumDestinoNav(null)
+    setAlbumDestinoBread([])
+    setModalMoverFotos(true)
   }
 
   async function excluirAlbum(albumId) {
@@ -2530,20 +2571,37 @@ export default function Dashboard() {
                     </div>
                   )}
 
+                  {/* Barra de ações quando fotos selecionadas */}
+                  {podeGerenciarGaleria && fotosSelecionadas.length > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#0f1117', borderRadius: '10px', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#fff', flex: 1 }}>{fotosSelecionadas.length} foto{fotosSelecionadas.length > 1 ? 's' : ''} selecionada{fotosSelecionadas.length > 1 ? 's' : ''}</span>
+                      <button onClick={abrirModalMover} style={{ padding: '6px 16px', borderRadius: '8px', border: 'none', background: '#374151', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>Mover</button>
+                      <button onClick={() => setConfirmExcluirFotos(true)} style={{ padding: '6px 16px', borderRadius: '8px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>Excluir</button>
+                      <button onClick={() => setFotosSelecionadas([])} style={{ padding: '6px 10px', borderRadius: '8px', border: 'none', background: 'none', color: '#9ca3af', fontWeight: 700, fontSize: '18px', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                    </div>
+                  )}
+
                   {/* Fotos do álbum atual */}
                   {albumAtivo && fotosAlbum.length === 0 && albuns.length === 0 && <p style={s.info}>Álbum vazio.</p>}
                   {albumAtivo && fotosAlbum.length > 0 && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px' }}>
-                      {fotosAlbum.map(f => (
-                        <div key={f.id} style={{ borderRadius: '8px', overflow: 'hidden' }}>
-                          <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', cursor: 'pointer' }} onClick={() => setFotoAmpliada(f)}>
-                            <img src={f.url} alt={f.nome} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                            {podeGerenciarGaleria && <button onClick={e => { e.stopPropagation(); excluirFoto(f) }} style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '24px', height: '24px', color: '#fff', cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>}
-                            {podeGerenciarGaleria && albumAtivo.capa_url !== f.url && <button onClick={async e => { e.stopPropagation(); await supabase.from('albuns').update({ capa_url: f.url }).eq('id', albumAtivo.id); setAlbumAtivo(a => ({ ...a, capa_url: f.url })); setAlbuns(prev => prev.map(a => a.id === albumAtivo.id ? { ...a, capa_url: f.url } : a)) }} style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '6px', padding: '3px 7px', color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 700, fontFamily: 'inherit' }}>Capa</button>}
-                            {albumAtivo.capa_url === f.url && <div style={{ position: 'absolute', bottom: '6px', left: '6px', background: '#F97310', borderRadius: '6px', padding: '3px 7px', color: '#fff', fontSize: '11px', fontWeight: 700 }}>✓ Capa</div>}
+                      {fotosAlbum.map(f => {
+                        const selecionada = fotosSelecionadas.some(s => s.id === f.id)
+                        return (
+                          <div key={f.id} style={{ borderRadius: '8px', overflow: 'hidden', outline: selecionada ? '3px solid #F97310' : 'none' }}>
+                            <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', cursor: 'pointer' }} onClick={() => { if (podeGerenciarGaleria && fotosSelecionadas.length > 0) { setFotosSelecionadas(prev => selecionada ? prev.filter(s => s.id !== f.id) : [...prev, f]) } else { setFotoAmpliada(f) } }}>
+                              <img src={f.url} alt={f.nome} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                              {podeGerenciarGaleria && (
+                                <div onClick={e => { e.stopPropagation(); setFotosSelecionadas(prev => selecionada ? prev.filter(s => s.id !== f.id) : [...prev, f]) }} style={{ position: 'absolute', top: '6px', right: '6px', width: '22px', height: '22px', borderRadius: '4px', background: selecionada ? '#F97310' : 'rgba(0,0,0,0.5)', border: '2px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                                  {selecionada && <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                                </div>
+                              )}
+                              {podeGerenciarGaleria && albumAtivo.capa_url !== f.url && <button onClick={async e => { e.stopPropagation(); await supabase.from('albuns').update({ capa_url: f.url }).eq('id', albumAtivo.id); setAlbumAtivo(a => ({ ...a, capa_url: f.url })); setAlbuns(prev => prev.map(a => a.id === albumAtivo.id ? { ...a, capa_url: f.url } : a)) }} style={{ position: 'absolute', bottom: '6px', left: '6px', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '6px', padding: '3px 7px', color: '#fff', cursor: 'pointer', fontSize: '11px', fontWeight: 700, fontFamily: 'inherit' }}>Capa</button>}
+                              {albumAtivo.capa_url === f.url && <div style={{ position: 'absolute', bottom: '6px', left: '6px', background: '#F97310', borderRadius: '6px', padding: '3px 7px', color: '#fff', fontSize: '11px', fontWeight: 700 }}>✓ Capa</div>}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
 
@@ -2625,6 +2683,57 @@ export default function Dashboard() {
                   </div>
                 )
               })()}
+
+              {/* Modal confirmar exclusão de fotos selecionadas */}
+              {confirmExcluirFotos && (
+                <div style={s.modalOverlay} onClick={() => setConfirmExcluirFotos(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '380px', padding: '28px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '8px' }}>Excluir fotos?</h3>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>Tem certeza que deseja excluir <strong>{fotosSelecionadas.length} foto{fotosSelecionadas.length > 1 ? 's' : ''}</strong>? Esta ação não pode ser desfeita.</p>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button onClick={() => setConfirmExcluirFotos(false)} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                      <button onClick={excluirFotosSelecionadas} style={{ flex: 1, padding: '10px', borderRadius: '10px', border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Excluir</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal mover fotos */}
+              {modalMoverFotos && (
+                <div style={s.modalOverlay} onClick={() => setModalMoverFotos(false)}>
+                  <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '420px', padding: '28px', boxShadow: '0 8px 48px rgba(0,0,0,0.2)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f1117', marginBottom: '4px' }}>Mover para...</h3>
+                    <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>{fotosSelecionadas.length} foto{fotosSelecionadas.length > 1 ? 's' : ''} selecionada{fotosSelecionadas.length > 1 ? 's' : ''}</p>
+                    {/* Breadcrumb */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 700, color: '#6b7280', marginBottom: '12px', flexWrap: 'wrap' }}>
+                      <span style={{ cursor: 'pointer', color: '#F97310' }} onClick={async () => { const { data } = await supabase.from('albuns').select('*').is('parent_id', null).order('nome'); setAlbumDestinoFilhos(data || []); setAlbumDestinoNav(null); setAlbumDestinoBread([]) }}>Raiz</span>
+                      {albumDestinoBread.map((b, i) => (
+                        <span key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ color: '#9ca3af' }}>›</span>
+                          <span style={{ cursor: 'pointer', color: i === albumDestinoBread.length - 1 ? '#0f1117' : '#F97310' }} onClick={async () => { if (i === albumDestinoBread.length - 1) return; const { data } = await supabase.from('albuns').select('*').eq('parent_id', b.id).order('nome'); setAlbumDestinoFilhos(data || []); setAlbumDestinoNav(b); setAlbumDestinoBread(prev => prev.slice(0, i + 1)) }}>{b.nome}</span>
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
+                      {albumDestinoFilhos.length === 0 && <p style={{ fontSize: '13px', color: '#9ca3af', textAlign: 'center', padding: '20px' }}>Nenhuma subpasta aqui</p>}
+                      {albumDestinoFilhos.map(a => (
+                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #f3f4f6', cursor: 'pointer' }}
+                          onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <span style={{ fontSize: '14px', fontWeight: 600, color: '#0f1117' }} onClick={() => moverFotosSelecionadas(a.id)}>📁 {a.nome}</span>
+                          <button onClick={async () => { const { data } = await supabase.from('albuns').select('*').eq('parent_id', a.id).order('nome'); setAlbumDestinoFilhos(data || []); setAlbumDestinoNav(a); setAlbumDestinoBread(prev => [...prev, a]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '18px', padding: '0 4px' }}>›</button>
+                        </div>
+                      ))}
+                    </div>
+                    {albumDestinoNav && (
+                      <button onClick={() => moverFotosSelecionadas(albumDestinoNav.id)} style={{ width: '100%', padding: '12px', borderRadius: '10px', border: 'none', background: '#F97310', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit', marginBottom: '8px' }}>
+                        Mover para "{albumDestinoNav.nome}"
+                      </button>
+                    )}
+                    <button onClick={() => setModalMoverFotos(false)} style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '14px', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
+                  </div>
+                </div>
+              )}
 
               {/* Modal confirmar exclusão de álbum */}
               {confirmExcluirAlbum && (
