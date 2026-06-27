@@ -2176,7 +2176,7 @@ export default function Dashboard() {
                     placeholder="Digite uma mensagem..."
                     className="grupo-chat-input"
                     rows={1}
-                    style={{ flex: 1, padding: '12px 16px', border: 'none', fontSize: '14px', fontFamily: 'inherit', outline: 'none', color: '#0f1117', background: 'transparent', opacity: 1, resize: 'none', overflowY: 'auto', lineHeight: '1.5', minHeight: '46px', maxHeight: '160px' }}
+                    style={{ flex: 1, padding: '12px 16px', border: 'none', fontSize: '14px', fontFamily: 'inherit', outline: 'none', color: '#0f1117', background: 'transparent', opacity: 1, resize: 'none', overflowY: 'hidden', lineHeight: '1.4', height: '42px', maxHeight: '160px' }}
                   />
                   <button onClick={() => { enviarMensagem(); if (chatInputRef.current) { chatInputRef.current.style.height = 'auto' } }} disabled={enviandoMensagem || !novaMensagem.trim()} style={{ background: '#F97310', border: 'none', borderRadius: '0', width: '46px', minHeight: '46px', alignSelf: 'flex-end', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, opacity: 1 }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
