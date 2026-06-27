@@ -1366,7 +1366,6 @@ export default function Dashboard() {
         faz_filmagens: data.faz_filmagens || false, outras_competencias: data.outras_competencias || false,
         outra_competencia_descricao: data.outra_competencia_descricao || '', sexo: data.sexo || '',
       })
-      if (camposFaltando(data).length > 0) setModalCadastroIncompleto(true)
     }
     setCarregandoVoluntario(false)
   }
@@ -1474,7 +1473,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setModalCadastroIncompleto(false)}
                 style={{ flex: 1, padding: '12px', borderRadius: '50px', border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                Deixar para depois
+                Mais tarde
               </button>
               <button onClick={() => { setModalCadastroIncompleto(false); setModalEditarPerfilAberto(true); carregarVoluntario() }}
                 style={{ flex: 1, padding: '12px', borderRadius: '50px', border: 'none', background: '#F97310', color: '#fff', fontWeight: 800, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit', letterSpacing: '0.5px' }}>
