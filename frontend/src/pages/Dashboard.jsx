@@ -316,6 +316,12 @@ export default function Dashboard() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificacoes', filter: `usuario_id=eq.${user.id}` }, payload => {
         setNotificacoes(prev => [payload.new, ...prev])
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notificacoes', filter: `usuario_id=eq.${user.id}` }, payload => {
+        if (payload.new.lida) setNotificacoes(prev => prev.filter(n => n.id !== payload.new.id))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'notificacoes' }, payload => {
+        setNotificacoes(prev => prev.filter(n => n.id !== payload.old.id))
+      })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [user])
@@ -1681,7 +1687,7 @@ export default function Dashboard() {
 
       <style>{`
         .grupo-chat-input::placeholder { color: #9ca3af !important; opacity: 1 !important; }
-        .carrossel-container { aspect-ratio: 16/6; max-height: 220px; }
+        .carrossel-container { aspect-ratio: 16/9; max-height: none; width: 100%; }
         .lightbox-arrow { display: flex !important; }
         @media (max-width: 768px) {
           .carrossel-container { aspect-ratio: 16/9 !important; max-height: none !important; }
@@ -1780,7 +1786,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         {/* Sino de notificações */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => { setSinoAberto(o => !o); setDropdownOpen(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+          <button onClick={async () => { const abrindo = !sinoAberto; setSinoAberto(abrindo); setDropdownOpen(false); if (abrindo) { const { data } = await supabase.from('notificacoes').select('*').eq('usuario_id', user.id).eq('lida', false).order('criado_em', { ascending: false }).limit(20); setNotificacoes(data || []) } }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             {notificacoes.length > 0 && (
               <span style={{ position: 'absolute', top: '2px', right: '2px', background: '#ef4444', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
@@ -2102,17 +2108,13 @@ export default function Dashboard() {
                 </div>
               </div>
             )
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-                {/* Carrossel */}
-                {fotosAnuncios.length > 0 && (() => {
+            const CarrosselBlock = fotosAnuncios.length > 0 ? (() => {
                   const idx = carrosselIdx % fotosAnuncios.length
                   clearTimeout(carrosselTimer.current)
                   carrosselTimer.current = setTimeout(() => setCarrosselIdx(i => i + 1), 12000)
                   return (
-                    <div className="carrossel-container" style={{ position: 'relative', borderRadius: '14px', overflow: 'hidden', background: '#0f1117' }}>
-                      <img src={fotosAnuncios[idx].url} alt="Anúncio" onClick={() => setExpandirAnuncio(idx)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }} />
+                    <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%', borderRadius: '14px', overflow: 'hidden', background: '#0f1117' }}>
+                      <img src={fotosAnuncios[idx].url} alt="Anúncio" onClick={() => setExpandirAnuncio(idx)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', cursor: 'zoom-in' }} />
                       <div style={{ position: 'absolute', bottom: '10px', left: 0, right: 0, display: 'flex', justifyContent: 'center', gap: '6px' }}>
                         {fotosAnuncios.map((_, i) => (
                           <button key={i} onClick={() => setCarrosselIdx(i)} style={{ width: i === idx ? '20px' : '8px', height: '8px', borderRadius: '999px', background: i === idx ? '#F97310' : 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', padding: 0, transition: 'all 0.3s' }} />
@@ -2122,16 +2124,17 @@ export default function Dashboard() {
                       <button onClick={() => setCarrosselIdx(i => (i + 1) % fotosAnuncios.length)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'rgba(0,0,0,0.4)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', color: '#fff', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
                     </div>
                   )
-                })()}
+                })() : null
 
-                {/* Próximas Ações */}
-                <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px' }}>
+            const EventosBlock = (
+                <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px', boxSizing: 'border-box' }} className="eventos-block">
                   <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Próximos eventos</p>
+                  <div className="eventos-scroll">
                   {painelCruzada.proximosEventos.length === 0
                     ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum evento cadastrado</div>
-                    : <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    : <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
                         {painelCruzada.proximosEventos.map(ev => (
-                          <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid #f3f4f6' }}>
+                          <div key={ev.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid #f3f4f6', flex: 1 }}>
                             <div style={{ minWidth: '48px', textAlign: 'center' }}>
                               <div style={{ fontSize: '11px', fontWeight: 800, color: '#F97310' }}>{new Date(ev.data + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</div>
                               {ev.hora_inicio && <div style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 600 }}>{ev.hora_inicio.slice(0,5)}</div>}
@@ -2144,12 +2147,15 @@ export default function Dashboard() {
                         ))}
                       </div>
                   }
+                  </div>{/* fim eventos-scroll */}
                   <button onClick={() => navigate('/sistema/agenda')} style={{ marginTop: '14px', width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #F97310', background: 'none', color: '#F97310', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>Ver agenda completa</button>
                 </div>
+            )
 
-                {/* Comunicados */}
-                <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px' }}>
+            const ComunicadosBlock = (
+                <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px', boxSizing: 'border-box' }} className="comunicados-block">
                   <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Comunicados (Grupo Geral)</p>
+                  <div className="comunicados-scroll">
                   {comunicados.length === 0
                     ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum comunicado</div>
                     : comunicados.slice(-3).reverse().map((c, i) => (
@@ -2159,13 +2165,15 @@ export default function Dashboard() {
                       </div>
                     ))
                   }
+                  </div>
                   {grupos.find(g => g.nome === 'Geral') && (
                     <button onClick={() => navigate(`/sistema/grupos/${grupos.find(g => g.nome === 'Geral').id}`)} style={{ marginTop: '14px', width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid #F97310', background: 'none', color: '#F97310', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>Abrir Grupo Geral</button>
                   )}
                 </div>
+            )
 
-                {/* Progresso */}
-                <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px' }}>
+            const ProgressoBlock = (
+                <div style={{ background: '#fff', border: '1.5px solid #f3f4f6', borderRadius: '14px', padding: '20px', height: '100%', boxSizing: 'border-box' }}>
                   <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Cadastros de Voluntário</p>
                   <div style={{ fontSize: '32px', fontWeight: 900, color: '#0f1117', marginBottom: '4px' }}>{pct}%</div>
                   <div style={{ fontSize: '13px', color: '#6b7280', marginBottom: '14px' }}>{totalCompletos} de {totalVoluntarios} voluntários com cadastro completo</div>
@@ -2173,7 +2181,33 @@ export default function Dashboard() {
                     <div style={{ width: `${pct}%`, height: '100%', background: '#F97310', borderRadius: '999px', transition: 'width 0.5s' }} />
                   </div>
                 </div>
+            )
 
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <style>{`
+                  @media (min-width: 900px) {
+                    .painel-linha1 { display: grid !important; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
+                    .painel-col-esquerda { display: flex; flex-direction: column; gap: 12px; }
+                    .comunicados-block { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+                    .comunicados-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+                    .painel-col-direita { display: flex; flex-direction: column; }
+                    .eventos-block { flex: 1; display: flex; flex-direction: column; box-sizing: border-box; }
+                    .eventos-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+                  }
+                `}</style>
+
+                {/* Linha 1: Carrossel+Comunicados (esq) + Eventos (dir) */}
+                <div className="painel-linha1" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div className="painel-col-esquerda" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {CarrosselBlock}
+                    {ComunicadosBlock}
+                  </div>
+                  <div className="painel-col-direita">{EventosBlock}</div>
+                </div>
+
+                {/* Linha 2: Progresso largura total */}
+                {ProgressoBlock}
               </div>
             )
           })()}
@@ -2302,7 +2336,7 @@ export default function Dashboard() {
                   <div style={{ position: 'fixed', ...(msgMenuPos.x + 150 > window.innerWidth ? { right: window.innerWidth - msgMenuPos.x - 20 } : { left: msgMenuPos.x }), ...(msgMenuPos.y > 160 ? { top: msgMenuPos.y - 10, transform: 'translateY(-100%)' } : { top: msgMenuPos.y + 30 }), background: '#1a1d27', borderRadius: '10px', boxShadow: '0 4px 20px rgba(0,0,0,0.15)', zIndex: 1000, minWidth: '140px', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
                     {msgMenuIsMinha && <button onClick={() => { const m = mensagensGrupo.find(x => x.id === msgMenuAberto); if (m) { setEditandoMsg(m.id); setTextoEditandoMsg(m.mensagem) } setMsgMenuAberto(null) }} style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#e5e7eb', cursor: 'pointer', fontFamily: 'inherit' }}>Editar</button>}
                     <button onClick={() => { const m = mensagensGrupo.find(x => x.id === msgMenuAberto); if (m) navigator.clipboard.writeText(m.mensagem); setMsgMenuAberto(null) }} style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#e5e7eb', cursor: 'pointer', fontFamily: 'inherit' }}>Copiar</button>
-                    {msgMenuIsMinha && <button onClick={async () => { await supabase.from('mensagens_grupo').delete().eq('id', msgMenuAberto); setMensagensGrupo(prev => prev.filter(x => x.id !== msgMenuAberto)); setMsgMenuAberto(null) }} style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#f87171', cursor: 'pointer', fontFamily: 'inherit' }}>Apagar</button>}
+                    {msgMenuIsMinha && <button onClick={async () => { await supabase.from('mensagens_grupo').delete().eq('id', msgMenuAberto); await supabase.from('notificacoes').delete().eq('referencia_id', msgMenuAberto); setMensagensGrupo(prev => prev.filter(x => x.id !== msgMenuAberto)); setMsgMenuAberto(null) }} style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', textAlign: 'left', fontSize: '13px', fontWeight: 600, color: '#f87171', cursor: 'pointer', fontFamily: 'inherit' }}>Apagar</button>}
                   </div>
                 </>
               )}
