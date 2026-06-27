@@ -13,7 +13,6 @@ export default function Home() {
   const [calEventoAberto, setCalEventoAberto] = useState(null) // id do evento expandido
   const [mobileDiaSel, setMobileDiaSel] = useState(new Date())
   const [mobileView, setMobileView] = useState('semana')
-  const [cruzadaComecou, setCruzadaComecou] = useState(() => new Date() >= new Date('2026-06-27T00:00:00'))
 
   useEffect(() => {
     if (calDiaSelecionado) {
@@ -44,7 +43,6 @@ export default function Home() {
       if (horas) horas.textContent = pad((diff % 86400000) / 3600000)
       if (min) min.textContent = pad((diff % 3600000) / 60000)
       if (seg) seg.textContent = pad((diff % 60000) / 1000)
-      if (diff === 0) setCruzadaComecou(true)
     }
     tick()
     const iv = setInterval(tick, 1000)
@@ -118,17 +116,6 @@ export default function Home() {
       obs.disconnect()
     }
   }, [navigate])
-
-  if (cruzadaComecou) return (
-    <div style={{ minHeight: '100vh', background: '#0f1117', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', fontFamily: "'Nunito', sans-serif", textAlign: 'center' }}>
-      <img src="/logo.png" alt="Cruzada Ibirité" style={{ width: '120px', marginBottom: '40px', borderRadius: '16px' }} />
-      <h1 style={{ fontSize: 'clamp(2rem, 8vw, 4rem)', fontWeight: 900, color: '#F97310', lineHeight: 1.1, marginBottom: '16px' }}>A Cruzada começou!</h1>
-      <p style={{ fontSize: 'clamp(1.1rem, 4vw, 1.6rem)', fontWeight: 700, color: '#fff', letterSpacing: '0.02em', marginBottom: '48px' }}>Que venha Teu Reino!</p>
-      <button onClick={() => navigate('/login')} style={{ background: '#F97310', color: '#fff', border: 'none', borderRadius: '50px', padding: '16px 48px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", letterSpacing: '1px', textTransform: 'uppercase' }}>
-        Acessar o sistema
-      </button>
-    </div>
-  )
 
   return (
     <>
