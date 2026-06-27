@@ -2044,7 +2044,7 @@ export default function Dashboard() {
                   <p style={{ fontSize: '12px', fontWeight: 800, color: '#F97310', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Comunicados (Grupo Geral)</p>
                   {comunicados.length === 0
                     ? <div style={{ fontSize: '13px', color: '#d1d5db' }}>Nenhum comunicado</div>
-                    : comunicados.map((c, i) => (
+                    : comunicados.slice(-3).reverse().map((c, i) => (
                       <div key={i} style={{ borderBottom: '1px solid #f3f4f6', paddingBottom: '10px', marginBottom: '10px' }}>
                         <div style={{ fontSize: '13px', color: '#374151', fontWeight: 600 }}>{c.mensagem}</div>
                         <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>{c.usuarios?.nome}</div>
