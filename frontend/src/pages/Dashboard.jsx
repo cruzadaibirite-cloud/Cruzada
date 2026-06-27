@@ -91,6 +91,8 @@ export default function Dashboard() {
   const [filtroUsuarioGrupo, setFiltroUsuarioGrupo] = useState('')
   const [filtrosExpandidos, setFiltrosExpandidos] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [notificacoes, setNotificacoes] = useState([])
+  const [sinoAberto, setSinoAberto] = useState(false)
   const [nomeUsuario, setNomeUsuario] = useState('')
   const [fotoUsuario, setFotoUsuario] = useState('')
   const [modalEditarPerfilAberto, setModalEditarPerfilAberto] = useState(false)
@@ -297,6 +299,21 @@ export default function Dashboard() {
     if (user?.id) carregarNome()
   }, [user])
 
+  useEffect(() => {
+    if (!user?.id) return
+    async function carregarNotificacoes() {
+      const { data } = await supabase.from('notificacoes').select('*').eq('usuario_id', user.id).eq('lida', false).order('criado_em', { ascending: false }).limit(20)
+      setNotificacoes(data || [])
+    }
+    carregarNotificacoes()
+    const channel = supabase.channel(`notificacoes-${user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notificacoes', filter: `usuario_id=eq.${user.id}` }, payload => {
+        setNotificacoes(prev => [payload.new, ...prev])
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user])
+
   function alterarPermissao(pagina, perfil, liberado) {
     setPermissoes(prev => {
       const existe = prev.some(p => p.pagina === pagina && p.perfil === perfil)
@@ -338,6 +355,7 @@ export default function Dashboard() {
   useEffect(() => {
     setMenuMobileAberto(false)
     setDropdownOpen(false)
+    setSinoAberto(false)
   }, [location.pathname])
 
   const [pessoasKanban, setPessoasKanban] = useState([])
@@ -387,6 +405,7 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    if (menu === 'cruzada') carregarPainelCruzada()
     if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'grupos') carregarGrupos()
@@ -397,12 +416,6 @@ export default function Dashboard() {
     if (menu === 'pessoas') { carregarPessoasKanban() }
     if (menu === 'mapa') carregarAbordagensComTotal()
     if (menu === 'galeria') { carregarAlbuns(); carregarVideosGaleria(); verificarGrupoMidia() }
-  }, [menu])
-
-  useEffect(() => {
-    if (menu !== 'cruzada') return
-    const t = setTimeout(() => carregarPainelCruzada(), 100)
-    return () => clearTimeout(t)
   }, [menu, minhaEquipeId])
 
   useEffect(() => {
@@ -510,6 +523,7 @@ export default function Dashboard() {
       if (!equipeId) {
         const { data: eq } = await supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', user.id).limit(1)
         equipeId = eq?.[0]?.equipe_id || null
+        if (equipeId) setMinhaEquipeId(equipeId)
       }
       if (equipeId) {
         query = query.or(`equipe_id.eq.${equipeId},equipe_id.is.null`)
@@ -1299,6 +1313,7 @@ export default function Dashboard() {
     if (!isAdmin && user?.id && !equipeIdFiltro) {
       const { data: eq } = await supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', user.id).limit(1)
       equipeIdFiltro = eq?.[0]?.equipe_id || null
+      if (equipeIdFiltro) setMinhaEquipeId(equipeIdFiltro)
     }
     let qEventosHoje = supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').eq('data', dataStr).order('hora_inicio')
     if (!isAdmin && equipeIdFiltro) qEventosHoje = qEventosHoje.or(`equipe_id.eq.${equipeIdFiltro},equipe_id.is.null`)
@@ -1721,8 +1736,51 @@ export default function Dashboard() {
           <img src="/logo.png" alt="Logo" style={{ height: '22px', width: 'auto' }} />
           <span style={s.headerTitle} className="dash-header-title">Cruzada <span style={{ color: '#F97310' }}>Ibirité</span></span>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Sino de notificações */}
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => { setSinoAberto(o => !o); setDropdownOpen(false) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            {notificacoes.length > 0 && (
+              <span style={{ position: 'absolute', top: '2px', right: '2px', background: '#ef4444', color: '#fff', borderRadius: '50%', width: '16px', height: '16px', fontSize: '10px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' }}>
+                {notificacoes.length > 9 ? '9+' : notificacoes.length}
+              </span>
+            )}
+          </button>
+          {sinoAberto && (
+            <div style={{ position: 'absolute', right: 0, top: '110%', width: '320px', background: '#fff', borderRadius: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', border: '1.5px solid #f3f4f6', zIndex: 1000, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '14px 16px', borderBottom: '1px solid #f3f4f6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 800, fontSize: '14px', color: '#0f1117' }}>Notificações</span>
+                {notificacoes.length > 0 && <button onClick={async () => { await supabase.from('notificacoes').update({ lida: true }).eq('usuario_id', user.id).eq('lida', false); setNotificacoes([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', color: '#F97310', fontWeight: 700, fontFamily: 'inherit' }}>Marcar todas como lidas</button>}
+              </div>
+              {notificacoes.length === 0
+                ? <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: '13px', color: '#9ca3af' }}>Nenhuma notificação</div>
+                : <div style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                    {notificacoes.map(n => (
+                      <div key={n.id} onClick={async () => { await supabase.from('notificacoes').update({ lida: true }).eq('id', n.id); setNotificacoes(prev => prev.filter(x => x.id !== n.id)); setSinoAberto(false); navigate(n.link) }} style={{ padding: '12px 16px', borderBottom: '1px solid #f9fafb', cursor: 'pointer', display: 'flex', gap: '10px', alignItems: 'flex-start' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f9fafb'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: n.tipo === 'mensagem' ? '#eff6ff' : '#fff4ec', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {n.tipo === 'mensagem'
+                            ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F97310" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                          }
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: '#0f1117', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.titulo}</div>
+                          {n.descricao && <div style={{ fontSize: '12px', color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.descricao}</div>}
+                          <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>{new Date(n.criado_em).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+              }
+            </div>
+          )}
+        </div>
+
         <div style={{ position: 'relative' }} className="dash-profile-btn">
-          <button style={s.profileBtn} onClick={() => setDropdownOpen(o => !o)}>
+          <button style={s.profileBtn} onClick={() => { setDropdownOpen(o => !o); setSinoAberto(false) }}>
             <div style={s.profileAvatar}>{fotoUsuario ? <img src={fotoUsuario} alt="Foto de perfil" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : getInitials(nomeUsuario || user?.email)}</div>
             <span style={s.profileEmail} className="dash-profile-email">{nomeUsuario || user?.email}</span>
             <span style={s.profileChevron} className="dash-profile-chevron">▾</span>
@@ -1743,6 +1801,7 @@ export default function Dashboard() {
               <button style={{ ...s.dropdownItem, color: '#0f1117' }} onClick={handleSignOut}>Sair</button>
             </div>
           )}
+        </div>
         </div>
       </div>
 
