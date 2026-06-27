@@ -387,7 +387,6 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
-    if (menu === 'cruzada') carregarPainelCruzada()
     if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'grupos') carregarGrupos()
@@ -398,6 +397,12 @@ export default function Dashboard() {
     if (menu === 'pessoas') { carregarPessoasKanban() }
     if (menu === 'mapa') carregarAbordagensComTotal()
     if (menu === 'galeria') { carregarAlbuns(); carregarVideosGaleria(); verificarGrupoMidia() }
+  }, [menu])
+
+  useEffect(() => {
+    if (menu !== 'cruzada') return
+    const t = setTimeout(() => carregarPainelCruzada(), 100)
+    return () => clearTimeout(t)
   }, [menu, minhaEquipeId])
 
   useEffect(() => {
@@ -505,7 +510,6 @@ export default function Dashboard() {
       if (!equipeId) {
         const { data: eq } = await supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', user.id).limit(1)
         equipeId = eq?.[0]?.equipe_id || null
-        if (equipeId) setMinhaEquipeId(equipeId)
       }
       if (equipeId) {
         query = query.or(`equipe_id.eq.${equipeId},equipe_id.is.null`)
@@ -1295,7 +1299,6 @@ export default function Dashboard() {
     if (!isAdmin && user?.id && !equipeIdFiltro) {
       const { data: eq } = await supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', user.id).limit(1)
       equipeIdFiltro = eq?.[0]?.equipe_id || null
-      if (equipeIdFiltro) setMinhaEquipeId(equipeIdFiltro)
     }
     let qEventosHoje = supabase.from('eventos').select('id, titulo, data, hora_inicio, locais(nome)').eq('data', dataStr).order('hora_inicio')
     if (!isAdmin && equipeIdFiltro) qEventosHoje = qEventosHoje.or(`equipe_id.eq.${equipeIdFiltro},equipe_id.is.null`)
