@@ -3044,6 +3044,7 @@ export default function Dashboard() {
           )}
 
           {menu === 'voluntarios' && selected && (
+            <>
             <div>
 
               {/* Barra de ações */}
@@ -3243,6 +3244,7 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            </>
           )}
 
           {menu === 'agenda' && (() => {
