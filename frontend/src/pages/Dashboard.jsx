@@ -528,24 +528,20 @@ export default function Dashboard() {
   }, [modalPessoa?.observacao_2])
 
   async function carregarEventos() {
-    let query = supabase.from('eventos').select('*, locais(nome), equipes(nome)').order('data').order('hora_inicio')
     const isAdminOuLider = perfilUsuario === 'admin' || perfilUsuario === 'lider'
-    if (!isAdminOuLider && user?.id) {
-      let equipeId = minhaEquipeId
-      if (!equipeId) {
-        const { data: eq } = await supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', user.id).limit(1)
-        equipeId = eq?.[0]?.equipe_id || null
-        if (equipeId) setMinhaEquipeId(equipeId)
-      }
-      if (equipeId) {
-        query = query.or(`equipe_id.eq.${equipeId},equipe_id.is.null`)
-      } else {
-        query = query.is('equipe_id', null)
-      }
+    let equipeId = minhaEquipeId
+    if (!isAdminOuLider && user?.id && !equipeId) {
+      const { data: eq } = await supabase.from('usuario_equipes').select('equipe_id').eq('usuario_id', user.id).limit(1)
+      equipeId = eq?.[0]?.equipe_id || null
+      if (equipeId) setMinhaEquipeId(equipeId)
     }
-    const { data } = await query
+    const { data } = await supabase.from('eventos').select('*, locais(nome), evento_equipes(equipe_id, equipes(id, nome, cor))').order('data').order('hora_inicio')
     if (data) {
-      setAgendaEventos(data.map(e => ({
+      let lista = data
+      if (!isAdminOuLider && equipeId) {
+        lista = data.filter(e => e.evento_equipes.length === 0 || e.evento_equipes.some(ee => ee.equipe_id === equipeId))
+      }
+      setAgendaEventos(lista.map(e => ({
         id: e.id,
         titulo: e.titulo,
         data: new Date(e.data + 'T00:00:00'),
@@ -556,8 +552,9 @@ export default function Dashboard() {
         descricao: e.descricao || '',
         local: e.locais?.nome || '',
         localId: e.local_id || null,
-        equipe: e.equipes?.nome || '',
-        equipeId: e.equipe_id || null,
+        equipesSelecionadas: (e.evento_equipes || []).map(ee => ({ id: ee.equipes?.id || ee.equipe_id, nome: ee.equipes?.nome || '', cor: ee.equipes?.cor || '' })),
+        equipe: (e.evento_equipes || []).map(ee => ee.equipes?.nome).filter(Boolean).join(', '),
+        equipeId: e.evento_equipes?.[0]?.equipe_id || null,
       })))
     }
   }
@@ -1626,7 +1623,7 @@ export default function Dashboard() {
                       </div>
                       {perfilUsuario === 'admin' && (
                         <div style={{ display: 'flex', gap: '10px', marginTop: '24px' }}>
-                          <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null); setModalEvento({ tipo: 'editar', evento: ev }); const d = ev.data; setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', organizacaoId: ev.organizacaoId || null, equipesSelecionadas: ev.equipeId ? [{ id: ev.equipeId, nome: ev.equipe, cor: equipes.find(e => e.id === ev.equipeId)?.cor }] : [] }) }}>Editar</button>
+                          <button style={{ ...s.editBtn, flex: 1, textAlign: 'center' }} onClick={() => { setAgendaDiaModal(null); setAgendaDiaEventoAberto(null); setModalEvento({ tipo: 'editar', evento: ev }); const d = ev.data; setFormEditEvento({ titulo: ev.titulo, data: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, horaInicio: ev.horaInicio || ev.hora, horaFim: ev.horaFim || '', cor: ev.cor, descricao: ev.descricao || '', local: ev.local || '', localId: ev.localId || null, equipe: ev.equipe || '', organizacaoId: ev.organizacaoId || null, equipesSelecionadas: ev.equipesSelecionadas || [] }) }}>Editar</button>
                           <button style={{ ...s.editBtn, flex: 1, textAlign: 'center', background: '#f3f4f6', color: '#0f1117', borderColor: '#e5e7eb' }} onClick={() => { if (window.confirm(`Excluir "${ev.titulo}"?`)) { /* excluirEvento handled outside */ } }}>Excluir</button>
                         </div>
                       )}
@@ -3528,16 +3525,19 @@ export default function Dashboard() {
               const payload = {
                 titulo: formEvento.titulo,
                 data: formEvento.data,
-                hora_inicio: formEvento.horaInicio,
-                hora_fim: formEvento.horaFim,
+                hora_inicio: formEvento.horaInicio || null,
+                hora_fim: formEvento.horaFim || null,
                 cor: formEvento.cor,
                 descricao: formEvento.descricao || null,
                 local_id: formEvento.localId || null,
-                equipe_id: formEvento.equipesSelecionadas?.length === 1 ? formEvento.equipesSelecionadas[0].id : (formEvento.equipeId || null),
               }
-              const { data, error } = await supabase.from('eventos').insert(payload).select('*, locais(nome), equipes(nome)').single()
+              const { data, error } = await supabase.from('eventos').insert(payload).select('*, locais(nome)').single()
               if (!error && data) {
-                const novo = { id: data.id, titulo: data.titulo, data: new Date(data.data + 'T00:00:00'), horaInicio: data.hora_inicio?.slice(0,5), horaFim: data.hora_fim?.slice(0,5), hora: data.hora_inicio?.slice(0,5), cor: data.cor, descricao: data.descricao || '', local: data.locais?.nome || '', localId: data.local_id, equipe: data.equipes?.nome || '', equipeId: data.equipe_id }
+                const equipesSel = formEvento.equipesSelecionadas || []
+                if (equipesSel.length > 0) {
+                  await supabase.from('evento_equipes').insert(equipesSel.map(e => ({ evento_id: data.id, equipe_id: e.id })))
+                }
+                const novo = { id: data.id, titulo: data.titulo, data: new Date(data.data + 'T00:00:00'), horaInicio: data.hora_inicio?.slice(0,5), horaFim: data.hora_fim?.slice(0,5), hora: data.hora_inicio?.slice(0,5), cor: data.cor, descricao: data.descricao || '', local: data.locais?.nome || '', localId: data.local_id, equipesSelecionadas: equipesSel, equipe: equipesSel.map(e => e.nome).join(', '), equipeId: equipesSel[0]?.id || null }
                 setAgendaEventos(ev => [...ev, novo])
               }
               setModalEvento(null)
@@ -4031,19 +4031,22 @@ export default function Dashboard() {
                                 const payload = {
                                   titulo: formEditEvento.titulo,
                                   data: formEditEvento.data,
-                                  hora_inicio: formEditEvento.horaInicio,
-                                  hora_fim: formEditEvento.horaFim,
+                                  hora_inicio: formEditEvento.horaInicio || null,
+                                  hora_fim: formEditEvento.horaFim || null,
                                   cor: formEditEvento.cor,
                                   descricao: formEditEvento.descricao || null,
                                   local_id: formEditEvento.localId || null,
-                                  equipe_id: formEditEvento.equipesSelecionadas?.length === 1 ? formEditEvento.equipesSelecionadas[0].id : (formEditEvento.equipeId || null),
                                 }
                                 const { error } = await supabase.from('eventos').update(payload).eq('id', modalEvento.evento.id)
-                                if (!error) {
-                                  const [y, m, d] = formEditEvento.data.split('-').map(Number)
-                                  const atualizado = { ...modalEvento.evento, ...formEditEvento, data: new Date(y, m-1, d), hora: formEditEvento.horaInicio, local: formEditEvento.local, equipe: formEditEvento.equipe }
-                                  setAgendaEventos(ev => ev.map(e => e.id === atualizado.id ? atualizado : e))
+                                if (error) { alert('Erro ao salvar: ' + error.message); return }
+                                const equipesSel = formEditEvento.equipesSelecionadas || []
+                                await supabase.from('evento_equipes').delete().eq('evento_id', modalEvento.evento.id)
+                                if (equipesSel.length > 0) {
+                                  await supabase.from('evento_equipes').insert(equipesSel.map(e => ({ evento_id: modalEvento.evento.id, equipe_id: e.id })))
                                 }
+                                const [y, m, d] = formEditEvento.data.split('-').map(Number)
+                                const atualizado = { ...modalEvento.evento, ...formEditEvento, data: new Date(y, m-1, d), hora: formEditEvento.horaInicio, local: formEditEvento.local, equipesSelecionadas: equipesSel, equipe: equipesSel.map(e => e.nome).join(', ') }
+                                setAgendaEventos(ev => ev.map(e => e.id === atualizado.id ? atualizado : e))
                                 setModalEvento(null)
                               }}>Salvar</button>
                             </div>
