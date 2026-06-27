@@ -2166,7 +2166,7 @@ export default function Dashboard() {
                   <textarea
                     value={novaMensagem}
                     onChange={e => setNovaMensagem(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !/Mobi|Android/i.test(navigator.userAgent)) { e.preventDefault(); enviarMensagem() } }}
+                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && e.ctrlKey) { e.preventDefault(); enviarMensagem() } }}
                     placeholder="Digite uma mensagem..."
                     className="grupo-chat-input"
                     rows={1}
