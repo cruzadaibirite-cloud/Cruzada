@@ -2145,7 +2145,7 @@ export default function Dashboard() {
                           </div>
                         ) : (
                           <>
-                            <div style={{ background: isMinha ? '#F97310' : '#fff', color: isMinha ? '#fff' : '#0f1117', borderRadius: isMinha ? '16px 16px 4px 16px' : '16px 16px 16px 4px', padding: '10px 14px', maxWidth: '75%', fontSize: '14px', lineHeight: 1.5, boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                            <div style={{ background: isMinha ? '#F97310' : '#fff', color: isMinha ? '#fff' : '#0f1117', borderRadius: isMinha ? '16px 16px 4px 16px' : '16px 16px 16px 4px', padding: '10px 14px', maxWidth: '75%', fontSize: '14px', lineHeight: 1.5, boxShadow: '0 1px 4px rgba(0,0,0,0.08)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                               {m.mensagem}
                             </div>
                             {(msgHovered === m.id || menuAberto) && (
