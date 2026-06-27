@@ -13,6 +13,7 @@ export default function Home() {
   const [calEventoAberto, setCalEventoAberto] = useState(null) // id do evento expandido
   const [mobileDiaSel, setMobileDiaSel] = useState(new Date())
   const [mobileView, setMobileView] = useState('semana')
+  const [cruzadaComecou, setCruzadaComecou] = useState(() => new Date() >= new Date('2026-06-27T00:00:00'))
 
   useEffect(() => {
     if (calDiaSelecionado) {
@@ -43,6 +44,7 @@ export default function Home() {
       if (horas) horas.textContent = pad((diff % 86400000) / 3600000)
       if (min) min.textContent = pad((diff % 3600000) / 60000)
       if (seg) seg.textContent = pad((diff % 60000) / 1000)
+      if (diff === 0) setCruzadaComecou(true)
     }
     tick()
     const iv = setInterval(tick, 1000)
@@ -511,12 +513,18 @@ export default function Home() {
             <div className="hero-badge">Uma cidade alcançada pelo Evangelho</div>
             <h1 className="hero-title">Alcançando<br /><span>toda Ibirité</span><br />com o Evangelho.</h1>
             <p className="hero-sub">De forma intencional, organizada e contínua, equipes percorrem cada bairro, rua e setor da cidade durante 9 dias intensos de missão.</p>
-            <div className="hero-cd">
-              <div className="hcd"><div className="hcd-num" id="cd-dias">00</div><div className="hcd-label">Dias</div></div>
-              <div className="hcd"><div className="hcd-num" id="cd-horas">00</div><div className="hcd-label">Horas</div></div>
-              <div className="hcd"><div className="hcd-num" id="cd-min">00</div><div className="hcd-label">Min</div></div>
-              <div className="hcd"><div className="hcd-num" id="cd-seg">00</div><div className="hcd-label">Seg</div></div>
-            </div>
+            {cruzadaComecou ? (
+              <div className="hero-cd">
+                <p style={{ fontSize: 'clamp(1.4rem, 4vw, 2rem)', fontWeight: 900, color: '#F97310', margin: 0 }}>A Cruzada começou!</p>
+              </div>
+            ) : (
+              <div className="hero-cd">
+                <div className="hcd"><div className="hcd-num" id="cd-dias">00</div><div className="hcd-label">Dias</div></div>
+                <div className="hcd"><div className="hcd-num" id="cd-horas">00</div><div className="hcd-label">Horas</div></div>
+                <div className="hcd"><div className="hcd-num" id="cd-min">00</div><div className="hcd-label">Min</div></div>
+                <div className="hcd"><div className="hcd-num" id="cd-seg">00</div><div className="hcd-label">Seg</div></div>
+              </div>
+            )}
           </div>
           <div className="hero-right">
             <div className="hero-circle-wrap">
