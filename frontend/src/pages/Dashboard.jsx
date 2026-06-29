@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Cropper from 'react-easy-crop'
 import MapaLocal from '../components/MapaLocal'
 import MapaEvangelismo from '../components/MapaEvangelismo'
@@ -235,7 +235,7 @@ export default function Dashboard() {
   const [modalAbordagem, setModalAbordagem] = useState(false)
   const [salvandoAbordagem, setSalvandoAbordagem] = useState(false)
   const [formAbordagem, setFormAbordagem] = useState({ local: '', endereco: '', data_hora: '', observacao: '', equipe_id: '' })
-  const [pessoas, setPessoas] = useState([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' }])
+  const [pessoas, setPessoas] = useState([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '', sexo: '' }])
   const [abordagemSelecionada, setAbordagemSelecionada] = useState(null)
   const [evangelizados, setEvangelizados] = useState([])
   const [buscandoLocalizacao, setBuscandoLocalizacao] = useState(false)
@@ -255,7 +255,7 @@ export default function Dashboard() {
   const [editEvangelizadoEnderecoConfirmado, setEditEvangelizadoEnderecoConfirmado] = useState(false)
   const buscaEditEvangelizadoTimer = useRef(null)
   const [adicionandoPessoa, setAdicionandoPessoa] = useState(false)
-  const [formNovaPessoa, setFormNovaPessoa] = useState({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' })
+  const [formNovaPessoa, setFormNovaPessoa] = useState({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '', sexo: '' })
   const [salvandoNovaPessoa, setSalvandoNovaPessoa] = useState(false)
   const [sugestoesNovaPessoa, setSugestoesNovaPessoa] = useState([])
   const [novaPessoaEnderecoConfirmado, setNovaPessoaEnderecoConfirmado] = useState(false)
@@ -394,7 +394,7 @@ export default function Dashboard() {
 
   async function carregarPessoasKanban() {
     setLoadingPessoas(true)
-    const { data } = await supabase.from('evangelizados').select('id, nome, telefone, observacao, observacao_2, status_contato, criado_em, abordagem_id, dependente, responsavel_id, convidado_culto, resposta_culto').order('criado_em', { ascending: false })
+    const { data } = await supabase.from('evangelizados').select('id, nome, telefone, observacao, observacao_2, status_contato, criado_em, abordagem_id, dependente, responsavel_id, convidado_culto, resposta_culto, sexo').order('criado_em', { ascending: false })
     if (data) {
       const atualizadas = await Promise.all(data.map(async p => {
         if (!p.telefone && (p.status_contato || 'pendente') === 'pendente' && !p.dependente) {
@@ -1141,7 +1141,7 @@ export default function Dashboard() {
 
   async function carregarDashboardEvang() {
     const [{ data: evang }, { data: abord }] = await Promise.all([
-      supabase.from('evangelizados').select('id, nome, telefone, status_contato, dependente, abordagem_id, criado_em').order('criado_em', { ascending: false }),
+      supabase.from('evangelizados').select('id, nome, telefone, status_contato, dependente, abordagem_id, criado_em, convidado_culto, resposta_culto, sexo').order('criado_em', { ascending: false }),
       supabase.from('abordagens').select('id, local, endereco, data_hora, evangelizados(count), equipes(nome)').order('data_hora', { ascending: false }),
     ])
     setDashEvangelizados(evang || [])
@@ -1202,7 +1202,7 @@ export default function Dashboard() {
           setModalDependentes(pessoasSalvas)
         }
       }
-      setPessoas([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' }])
+      setPessoas([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '', sexo: '' }])
       carregarAbordagens()
     }
   }
@@ -1313,11 +1313,12 @@ export default function Dashboard() {
       status_contato: 'pendente',
       convidado_culto: formNovaPessoa.convidado_culto || false,
       resposta_culto: formNovaPessoa.resposta_culto || null,
+      sexo: formNovaPessoa.sexo || null,
     }).select().single()
     setSalvandoNovaPessoa(false)
     if (!error && data) {
       setEvangelizados(list => [...list, data])
-      setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' })
+      setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '', sexo: '' })
       setAdicionandoPessoa(false)
     }
   }
@@ -1331,6 +1332,7 @@ export default function Dashboard() {
       observacao: formEditEvangelizado.observacao,
       convidado_culto: formEditEvangelizado.convidado_culto || false,
       resposta_culto: formEditEvangelizado.resposta_culto || null,
+      sexo: formEditEvangelizado.sexo || null,
     }).eq('id', editandoEvangelizado)
     setSalvandoEvangelizado(false)
     if (!error) {
@@ -2840,6 +2842,7 @@ export default function Dashboard() {
             const responsaveis = totalEvang - dependentes
             const pendentes = dashEvangelizados.filter(e => !e.status_contato || e.status_contato === 'pendente').length
             const contatados = dashEvangelizados.filter(e => e.status_contato === 'contatado').length
+            const vaoAoCulto = dashEvangelizados.filter(e => e.resposta_culto === 'vai').length
 
             const pct = (n, d) => d === 0 ? 0 : Math.round((n / d) * 100)
 
@@ -2881,11 +2884,12 @@ export default function Dashboard() {
                 </div>
 
                 {/* KPIs */}
-                <div className="dash-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
+                <div className="dash-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
                   {[
                     { label: 'Evangelizados', value: totalEvang, color: '#0f1117', bg: '#fff', border: '#e5e7eb' },
-                    { label: 'Abordagens', value: totalAbord, color: '#F97310', bg: '#fff4ec', border: '#fed7aa' },
-                    { label: 'Contatados', value: contatados, color: '#F97310', bg: '#fff4ec', border: '#fed7aa' },
+                    { label: 'Abordagens', value: totalAbord, color: '#0f1117', bg: '#fff', border: '#e5e7eb' },
+                    { label: 'Contatados', value: contatados, color: '#0f1117', bg: '#fff', border: '#e5e7eb' },
+                    { label: 'Vão ao culto', value: vaoAoCulto, color: '#0f1117', bg: '#fff', border: '#e5e7eb' },
                   ].map(k => (
                     <div key={k.label} style={{ background: k.bg, border: `1.5px solid ${k.border}`, borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                       <div style={{ fontSize: '12px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>{k.label}</div>
@@ -2928,15 +2932,6 @@ export default function Dashboard() {
                     </div>
                   )
                 })()}
-
-                {/* Linha 2 */}
-                <div className="dash-mid-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', marginBottom: '16px' }}>
-
-
-
-
-
-                </div>
 
                 {/* Linha 3 */}
                 <div className="dash-bot-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -2983,6 +2978,114 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+
+                {/* Culto — pizza e rosca separadas */}
+                {(() => {
+                  const convidados = dashEvangelizados.filter(e => e.convidado_culto).length
+                  const naoConvidados = totalEvang - convidados
+                  const respostasOpts = [
+                    { label: 'Vai', key: 'vai', cor: '#16a34a' },
+                    { label: 'Não vai', key: 'nao_vai', cor: '#ef4444' },
+                    { label: 'Não sabe', key: 'nao_sabe', cor: '#9ca3af' },
+                  ]
+
+                  function buildSlices(fatias, total) {
+                    let ang = -Math.PI / 2
+                    return fatias.filter(f => f.count > 0).map(f => {
+                      const theta = (f.count / (total || 1)) * 2 * Math.PI
+                      const x1 = 80 + 70 * Math.cos(ang), y1 = 80 + 70 * Math.sin(ang)
+                      ang += theta
+                      const x2 = 80 + 70 * Math.cos(ang), y2 = 80 + 70 * Math.sin(ang)
+                      return { ...f, d: `M80,80 L${x1},${y1} A70,70,0,${theta > Math.PI ? 1 : 0},1,${x2},${y2} Z` }
+                    })
+                  }
+
+                  const pizzaSlices = buildSlices([
+                    { label: 'Convidados', cor: '#F97310', count: convidados },
+                    { label: 'Não convidados', cor: '#e5e7eb', count: naoConvidados },
+                  ], totalEvang)
+
+                  const roscaSlices = buildSlices(
+                    respostasOpts.map(r => ({ ...r, count: dashEvangelizados.filter(e => e.resposta_culto === r.key).length })),
+                    convidados
+                  )
+
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                      {/* Pizza — respostas ao convite */}
+                      <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                        <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '20px' }}>Resposta ao convite</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                          <svg width="160" height="160" viewBox="0 0 160 160" style={{ flexShrink: 0 }}>
+                            {roscaSlices.length > 0 ? roscaSlices.map((p, i) => <path key={i} d={p.d} fill={p.cor} stroke="#fff" strokeWidth="2" />) : <circle cx="80" cy="80" r="70" fill="#f3f4f6" />}
+                            <text x="80" y="75" textAnchor="middle" fontSize="20" fontWeight="900" fill="#0f1117">{roscaSlices.reduce((s, r) => s + r.count, 0)}</text>
+                            <text x="80" y="91" textAnchor="middle" fontSize="8" fontWeight="700" fill="#9ca3af">RESPOSTAS</text>
+                          </svg>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                            {respostasOpts.map((r, i) => {
+                              const count = dashEvangelizados.filter(e => e.resposta_culto === r.key).length
+                              return (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: r.cor, flexShrink: 0 }} />
+                                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>{r.label}</span>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: 800, color: r.cor }}>{count}</span>
+                                    <span style={{ fontSize: '11px', color: '#9ca3af' }}>{pct(count, convidados || 1)}%</span>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Rosca — sexo */}
+                      {(() => {
+                        const sexoOpts = [
+                          { key: 'Masculino', label: 'Masculino', cor: '#3b82f6' },
+                          { key: 'Feminino', label: 'Feminino', cor: '#ec4899' },
+                        ]
+                        const totalComSexo = dashEvangelizados.filter(e => e.sexo).length
+                        const sexoSlices = buildSlices(
+                          sexoOpts.map(r => ({ ...r, count: dashEvangelizados.filter(e => e.sexo === r.key).length })),
+                          totalComSexo
+                        )
+                        return (
+                          <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                            <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '20px' }}>Sexo</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+                              <svg width="160" height="160" viewBox="0 0 160 160" style={{ flexShrink: 0 }}>
+                                {sexoSlices.length > 0 ? sexoSlices.map((p, i) => <path key={i} d={p.d} fill={p.cor} stroke="#fff" strokeWidth="2" />) : <circle cx="80" cy="80" r="70" fill="#f3f4f6" />}
+                                <circle cx="80" cy="80" r="34" fill="#fff" />
+                                <text x="80" y="75" textAnchor="middle" fontSize="20" fontWeight="900" fill="#0f1117">{totalComSexo}</text>
+                                <text x="80" y="91" textAnchor="middle" fontSize="8" fontWeight="700" fill="#9ca3af">PESSOAS</text>
+                              </svg>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                                {sexoOpts.map((r, i) => {
+                                  const count = dashEvangelizados.filter(e => e.sexo === r.key).length
+                                  return (
+                                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: r.cor, flexShrink: 0 }} />
+                                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#374151' }}>{r.label}</span>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '4px' }}>
+                                        <span style={{ fontSize: '13px', fontWeight: 800, color: r.cor }}>{count}</span>
+                                        <span style={{ fontSize: '11px', color: '#9ca3af' }}>{pct(count, totalComSexo || 1)}%</span>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )
+                })()}
 
               </>
             )
@@ -4851,9 +4954,23 @@ export default function Dashboard() {
                               )}
                             </div>
                           </div>
-                          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f9fafb', borderRadius: '10px', border: '1.5px solid #e5e7eb' }}>
-                            <input type="checkbox" id={`convidado-nova-${idx}`} checked={!!pessoa.convidado_culto} onChange={e => setPessoas(p => p.map((x, i) => i === idx ? { ...x, convidado_culto: e.target.checked, resposta_culto: e.target.checked ? x.resposta_culto : '' } : x))} style={{ width: '16px', height: '16px', accentColor: '#F97310', cursor: 'pointer' }} />
-                            <label htmlFor={`convidado-nova-${idx}`} style={{ fontSize: '13px', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Convidado para o culto da Cruzada?</label>
+                          <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <label style={s.fieldLabel}>Sexo</label>
+                              <select value={pessoa.sexo || ''} onChange={e => setPessoas(p => p.map((x, i) => i === idx ? { ...x, sexo: e.target.value } : x))} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontWeight: 600, color: pessoa.sexo ? '#374151' : '#9ca3af', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                <option value="">Selecionar</option>
+                                <option value="Masculino">Masculino</option>
+                                <option value="Feminino">Feminino</option>
+                              </select>
+                            </div>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <label style={s.fieldLabel}>Convite</label>
+                              <select value={pessoa.convidado_culto === true ? 'sim' : pessoa.convidado_culto === false && pessoa.convidado_culto !== '' ? 'nao' : ''} onChange={e => setPessoas(p => p.map((x, i) => i === idx ? { ...x, convidado_culto: e.target.value === 'sim' ? true : e.target.value === 'nao' ? false : '', resposta_culto: e.target.value === 'sim' ? x.resposta_culto : '' } : x))} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontWeight: 600, color: pessoa.convidado_culto !== '' ? '#374151' : '#9ca3af', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                <option value="">Selecionar</option>
+                                <option value="sim">Sim</option>
+                                <option value="nao">Não</option>
+                              </select>
+                            </div>
                           </div>
                           {pessoa.convidado_culto && (
                             <div style={{ marginTop: '10px' }}>
@@ -5028,12 +5145,26 @@ export default function Dashboard() {
                                 </div>
                               )}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f9fafb', borderRadius: '10px', border: '1.5px solid #e5e7eb' }}>
-                              <input type="checkbox" id={`convidado-edit-${ev.id}`} checked={!!formEditEvangelizado.convidado_culto} onChange={e => setFormEditEvangelizado(f => ({ ...f, convidado_culto: e.target.checked }))} style={{ width: '16px', height: '16px', accentColor: '#F97310', cursor: 'pointer' }} />
-                              <label htmlFor={`convidado-edit-${ev.id}`} style={{ fontSize: '13px', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Convidado para o culto da Cruzada?</label>
+                            <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <label style={s.fieldLabel}>Sexo</label>
+                                <select value={formEditEvangelizado.sexo || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, sexo: e.target.value }))} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontWeight: 600, color: formEditEvangelizado.sexo ? '#374151' : '#9ca3af', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                  <option value="">Selecionar</option>
+                                  <option value="Masculino">Masculino</option>
+                                  <option value="Feminino">Feminino</option>
+                                </select>
+                              </div>
+                              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <label style={s.fieldLabel}>Convite</label>
+                                <select value={formEditEvangelizado.convidado_culto === true ? 'sim' : formEditEvangelizado.convidado_culto === false ? 'nao' : ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, convidado_culto: e.target.value === 'sim' ? true : e.target.value === 'nao' ? false : '', resposta_culto: e.target.value === 'sim' ? f.resposta_culto : '' }))} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontWeight: 600, color: formEditEvangelizado.convidado_culto !== '' ? '#374151' : '#9ca3af', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                  <option value="">Selecionar</option>
+                                  <option value="sim">Sim</option>
+                                  <option value="nao">Não</option>
+                                </select>
+                              </div>
                             </div>
                             {formEditEvangelizado.convidado_culto && (
-                              <div>
+                              <div style={{ marginTop: '10px' }}>
                                 <label style={s.fieldLabel}>Vai comparecer?</label>
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                   {['vai', 'nao_vai', 'nao_sabe'].map(op => (
@@ -5064,7 +5195,7 @@ export default function Dashboard() {
                               </div>
                               {(perfilUsuario === 'admin' || abordagemSelecionada.usuario_id === user?.id) && (
                                 <button
-                                  onClick={() => { setEditandoEvangelizado(ev.id); setFormEditEvangelizado({ nome: ev.nome, telefone: ev.telefone, endereco_pessoa: ev.endereco_pessoa, observacao: ev.observacao, convidado_culto: ev.convidado_culto || false, resposta_culto: ev.resposta_culto || '' }); setSugestoesEditEvangelizado([]); setEditEvangelizadoEnderecoConfirmado(true) }}
+                                  onClick={() => { setEditandoEvangelizado(ev.id); setFormEditEvangelizado({ nome: ev.nome, telefone: ev.telefone, endereco_pessoa: ev.endereco_pessoa, observacao: ev.observacao, convidado_culto: ev.convidado_culto || false, resposta_culto: ev.resposta_culto || '', sexo: ev.sexo || '' }); setSugestoesEditEvangelizado([]); setEditEvangelizadoEnderecoConfirmado(true) }}
                                   style={{ background: '#fff', border: 'none', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 700, color: '#0f1117', cursor: 'pointer', fontFamily: 'inherit' }}
                                 >Editar</button>
                               )}
@@ -5126,12 +5257,26 @@ export default function Dashboard() {
                             )}
                           </div>
                           <div><label style={s.fieldLabel}>Observação</label><input style={s.inputEdit} placeholder="Observação" value={formNovaPessoa.observacao} onChange={e => setFormNovaPessoa(f => ({ ...f, observacao: e.target.value }))} /></div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f9fafb', borderRadius: '10px', border: '1.5px solid #e5e7eb' }}>
-                            <input type="checkbox" id="convidado-nova" checked={!!formNovaPessoa.convidado_culto} onChange={e => setFormNovaPessoa(f => ({ ...f, convidado_culto: e.target.checked }))} style={{ width: '16px', height: '16px', accentColor: '#F97310', cursor: 'pointer' }} />
-                            <label htmlFor="convidado-nova" style={{ fontSize: '13px', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Convidado para o culto da Cruzada?</label>
+                          <div style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <label style={s.fieldLabel}>Sexo</label>
+                              <select value={formNovaPessoa.sexo || ''} onChange={e => setFormNovaPessoa(f => ({ ...f, sexo: e.target.value }))} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontWeight: 600, color: formNovaPessoa.sexo ? '#374151' : '#9ca3af', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                <option value="">Selecionar</option>
+                                <option value="Masculino">Masculino</option>
+                                <option value="Feminino">Feminino</option>
+                              </select>
+                            </div>
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <label style={s.fieldLabel}>Convite</label>
+                              <select value={formNovaPessoa.convidado_culto === true ? 'sim' : formNovaPessoa.convidado_culto === false ? 'nao' : ''} onChange={e => setFormNovaPessoa(f => ({ ...f, convidado_culto: e.target.value === 'sim' ? true : e.target.value === 'nao' ? false : '', resposta_culto: e.target.value === 'sim' ? f.resposta_culto : '' }))} style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1.5px solid #e5e7eb', fontSize: '13px', fontWeight: 600, color: formNovaPessoa.convidado_culto !== '' ? '#374151' : '#9ca3af', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                <option value="">Selecionar</option>
+                                <option value="sim">Sim</option>
+                                <option value="nao">Não</option>
+                              </select>
+                            </div>
                           </div>
                           {formNovaPessoa.convidado_culto && (
-                            <div>
+                            <div style={{ marginTop: '10px' }}>
                               <label style={s.fieldLabel}>Vai comparecer?</label>
                               <div style={{ display: 'flex', gap: '8px' }}>
                                 {['vai', 'nao_vai', 'nao_sabe'].map(op => (
@@ -5145,7 +5290,7 @@ export default function Dashboard() {
                           )}
                         </div>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button style={{ ...s.backBtn, background: '#9ca3af', border: 'none', color: '#fff' }} onClick={() => { setAdicionandoPessoa(false); setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' }); setSugestoesNovaPessoa([]); setNovaPessoaEnderecoConfirmado(false) }}>Cancelar</button>
+                          <button style={{ ...s.backBtn, background: '#9ca3af', border: 'none', color: '#fff' }} onClick={() => { setAdicionandoPessoa(false); setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '', sexo: '' }); setSugestoesNovaPessoa([]); setNovaPessoaEnderecoConfirmado(false) }}>Cancelar</button>
                           <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarNovaPessoa} disabled={salvandoNovaPessoa}>{salvandoNovaPessoa ? 'Salvando...' : 'Salvar'}</button>
                         </div>
                       </div>
@@ -6136,3 +6281,4 @@ const s = {
     marginTop: '10px',
   },
 }
+
