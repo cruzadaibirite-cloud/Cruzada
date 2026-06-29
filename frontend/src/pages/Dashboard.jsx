@@ -235,7 +235,7 @@ export default function Dashboard() {
   const [modalAbordagem, setModalAbordagem] = useState(false)
   const [salvandoAbordagem, setSalvandoAbordagem] = useState(false)
   const [formAbordagem, setFormAbordagem] = useState({ local: '', endereco: '', data_hora: '', observacao: '', equipe_id: '' })
-  const [pessoas, setPessoas] = useState([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '' }])
+  const [pessoas, setPessoas] = useState([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' }])
   const [abordagemSelecionada, setAbordagemSelecionada] = useState(null)
   const [evangelizados, setEvangelizados] = useState([])
   const [buscandoLocalizacao, setBuscandoLocalizacao] = useState(false)
@@ -247,6 +247,7 @@ export default function Dashboard() {
   const [pessoasConfirmadas, setPessoasConfirmadas] = useState({})
   const buscaPessoaTimer = useRef({})
   const [abordagensComTotal, setAbordagensComTotal] = useState([])
+  const [dashEvangelizados, setDashEvangelizados] = useState([])
   const [editandoEvangelizado, setEditandoEvangelizado] = useState(null)
   const [formEditEvangelizado, setFormEditEvangelizado] = useState({})
   const [salvandoEvangelizado, setSalvandoEvangelizado] = useState(false)
@@ -254,7 +255,7 @@ export default function Dashboard() {
   const [editEvangelizadoEnderecoConfirmado, setEditEvangelizadoEnderecoConfirmado] = useState(false)
   const buscaEditEvangelizadoTimer = useRef(null)
   const [adicionandoPessoa, setAdicionandoPessoa] = useState(false)
-  const [formNovaPessoa, setFormNovaPessoa] = useState({ nome: '', telefone: '', endereco_pessoa: '', observacao: '' })
+  const [formNovaPessoa, setFormNovaPessoa] = useState({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' })
   const [salvandoNovaPessoa, setSalvandoNovaPessoa] = useState(false)
   const [sugestoesNovaPessoa, setSugestoesNovaPessoa] = useState([])
   const [novaPessoaEnderecoConfirmado, setNovaPessoaEnderecoConfirmado] = useState(false)
@@ -393,7 +394,7 @@ export default function Dashboard() {
 
   async function carregarPessoasKanban() {
     setLoadingPessoas(true)
-    const { data } = await supabase.from('evangelizados').select('id, nome, telefone, observacao, observacao_2, status_contato, criado_em, abordagem_id, dependente, responsavel_id').order('criado_em', { ascending: false })
+    const { data } = await supabase.from('evangelizados').select('id, nome, telefone, observacao, observacao_2, status_contato, criado_em, abordagem_id, dependente, responsavel_id, convidado_culto, resposta_culto').order('criado_em', { ascending: false })
     if (data) {
       const atualizadas = await Promise.all(data.map(async p => {
         if (!p.telefone && (p.status_contato || 'pendente') === 'pendente' && !p.dependente) {
@@ -418,7 +419,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (menu === 'cruzada') carregarPainelCruzada()
-    if (menu === 'voluntarios' || menu === 'dashboard') carregarVoluntarios()
+    if (menu === 'voluntarios') carregarVoluntarios()
+    if (menu === 'dashboard') carregarDashboardEvang()
     if (menu === 'usuarios') { carregarUsuarios(); carregarEquipes(); carregarGrupos() }
     if (menu === 'grupos') carregarGrupos()
     if (menu === 'grupos' && !grupoIdPage) setGrupoAtivo(null)
@@ -1137,6 +1139,15 @@ export default function Dashboard() {
     }
   }
 
+  async function carregarDashboardEvang() {
+    const [{ data: evang }, { data: abord }] = await Promise.all([
+      supabase.from('evangelizados').select('id, nome, telefone, status_contato, dependente, abordagem_id, criado_em').order('criado_em', { ascending: false }),
+      supabase.from('abordagens').select('id, local, endereco, data_hora, evangelizados(count), equipes(nome)').order('data_hora', { ascending: false }),
+    ])
+    setDashEvangelizados(evang || [])
+    setAbordagensComTotal((abord || []).map(ab => ({ ...ab, total_pessoas: ab.evangelizados?.[0]?.count || 0 })))
+  }
+
   async function carregarAbordagens() {
     setLoadingEvang(true)
     const { data } = await supabase
@@ -1173,7 +1184,7 @@ export default function Dashboard() {
     const { error } = await supabase.rpc('registrar_abordagem', {
       p_local: enderecoCompleto,
       p_endereco: enderecoCompleto || null,
-      p_data_hora: formAbordagem.data_hora || new Date().toISOString(),
+      p_data_hora: formAbordagem.data_hora ? new Date(formAbordagem.data_hora).toISOString() : new Date().toISOString(),
       p_usuario_id: user?.id,
       p_observacao: formAbordagem.observacao || null,
       p_pessoas: pessoasValidas,
@@ -1191,7 +1202,7 @@ export default function Dashboard() {
           setModalDependentes(pessoasSalvas)
         }
       }
-      setPessoas([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '' }])
+      setPessoas([{ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' }])
       carregarAbordagens()
     }
   }
@@ -1276,7 +1287,7 @@ export default function Dashboard() {
     const { error } = await supabase.from('abordagens').update({
       local: formEditAbordagem.endereco,
       endereco: formEditAbordagem.endereco,
-      data_hora: formEditAbordagem.data_hora || null,
+      data_hora: formEditAbordagem.data_hora ? new Date(formEditAbordagem.data_hora).toISOString() : null,
       observacao: formEditAbordagem.observacao || null,
       equipe_id: formEditAbordagem.equipe_id || null,
     }).eq('id', abordagemSelecionada.id)
@@ -1300,11 +1311,13 @@ export default function Dashboard() {
       endereco_pessoa: formNovaPessoa.endereco_pessoa || null,
       observacao: formNovaPessoa.observacao || null,
       status_contato: 'pendente',
+      convidado_culto: formNovaPessoa.convidado_culto || false,
+      resposta_culto: formNovaPessoa.resposta_culto || null,
     }).select().single()
     setSalvandoNovaPessoa(false)
     if (!error && data) {
       setEvangelizados(list => [...list, data])
-      setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '' })
+      setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' })
       setAdicionandoPessoa(false)
     }
   }
@@ -1316,6 +1329,8 @@ export default function Dashboard() {
       telefone: formEditEvangelizado.telefone,
       endereco_pessoa: formEditEvangelizado.endereco_pessoa,
       observacao: formEditEvangelizado.observacao,
+      convidado_culto: formEditEvangelizado.convidado_culto || false,
+      resposta_culto: formEditEvangelizado.resposta_culto || null,
     }).eq('id', editandoEvangelizado)
     setSalvandoEvangelizado(false)
     if (!error) {
@@ -2817,210 +2832,129 @@ export default function Dashboard() {
           )}
 
           {menu === 'dashboard' && (() => {
-            const base = filtro ? filtro.lista : voluntarios
-            const total = base.length
-            const aprovados = base.filter(v => v.status === 'aprovado').length
-            const pendentes = base.filter(v => !v.status || v.status === 'pendente').length
-            const reprovados = base.filter(v => v.status === 'reprovado').length
-            const masculino = base.filter(v => v.sexo === 'Masculino').length
-            const feminino = base.filter(v => v.sexo === 'Feminino').length
-            const foraMG = base.filter(v => v.cidade_estado_pais && !v.cidade_estado_pais.includes('Minas Gerais')).length
-            const missionarios = base.filter(v => v.ja_participou_missao === true).length
-            const solteiros = base.filter(v => v.estado_civil === 'solteiro').length
-            const casados = base.filter(v => v.estado_civil === 'casado').length
-            const incompletos = base.filter(v => camposFaltando(v).length > 0).length
-
-            function hover(e, titulo, lista) {
-              const rect = e.currentTarget.getBoundingClientRect()
-              const tooltipW = 340
-              const tooltipH = 280
-              let x = rect.left
-              let y = rect.bottom + 8
-              if (x + tooltipW > window.innerWidth - 8) x = window.innerWidth - tooltipW - 8
-              if (x < 8) x = 8
-              if (y + tooltipH > window.innerHeight - 8) y = rect.top - tooltipH - 8
-              clearTimeout(tooltipTimer.current)
-              tooltipTimer.current = setTimeout(() => setTooltip({ titulo, lista, x, y }), 1000)
-            }
-            function clique(titulo, lista) {
-              if (filtro?.titulo === titulo) { setFiltro(null) } else { setFiltro({ titulo, lista }) }
-            }
-            function itemStyle(titulo) {
-              return filtro?.titulo === titulo
-                ? { cursor: 'pointer' }
-                : { cursor: 'pointer' }
-            }
-
-            const cidades = {}
-            base.forEach(v => {
-              if (!v.cidade_estado_pais) return
-              const cidade = v.cidade_estado_pais.split(',')[0].trim()
-              cidades[cidade] = (cidades[cidade] || 0) + 1
-            })
-            const topCidades = Object.entries(cidades).sort((a, b) => b[1] - a[1])
-            const maxCidadeReal = topCidades.length > 0 ? topCidades[0][1] : 1
-
-            const competencias = [
-              { label: 'Mídia/Fotos', count: base.filter(v => v.tira_fotos).length },
-              { label: 'Filmagem', count: base.filter(v => v.faz_filmagens).length },
-              { label: 'Canto', count: base.filter(v => v.canta).length },
-              { label: 'Instrumento', count: base.filter(v => v.toca_instrumento).length },
-              { label: 'Inglês', count: base.filter(v => v.fala_ingles).length },
-              { label: 'Espanhol', count: base.filter(v => v.fala_espanhol).length },
-              { label: 'LIBRAS/Outros', count: base.filter(v => v.outras_competencias).length },
-            ].sort((a, b) => b.count - a.count)
-
-            const faixas = [
-              { label: '16–20', count: base.filter(v => v.idade >= 16 && v.idade <= 20).length },
-              { label: '21–25', count: base.filter(v => v.idade >= 21 && v.idade <= 25).length },
-              { label: '26–30', count: base.filter(v => v.idade >= 26 && v.idade <= 30).length },
-              { label: '31–40', count: base.filter(v => v.idade >= 31 && v.idade <= 40).length },
-              { label: '40+',   count: base.filter(v => v.idade > 40).length },
-            ]
-            const maxFaixa = Math.max(...faixas.map(f => f.count), 1)
-            const maxCidade = maxCidadeReal
-            const maxComp = Math.max(...competencias.map(c => c.count), 1)
+            const totalEvang = dashEvangelizados.length
+            const totalAbord = abordagensComTotal.length
+            const comTelefone = dashEvangelizados.filter(e => e.telefone).length
+            const emDiscipulado = dashEvangelizados.filter(e => e.status_contato === 'discipulado').length
+            const dependentes = dashEvangelizados.filter(e => e.dependente).length
+            const responsaveis = totalEvang - dependentes
+            const pendentes = dashEvangelizados.filter(e => !e.status_contato || e.status_contato === 'pendente').length
+            const contatados = dashEvangelizados.filter(e => e.status_contato === 'contatado').length
 
             const pct = (n, d) => d === 0 ? 0 : Math.round((n / d) * 100)
+
+            // Evangelizados por equipe
+            const equipeMap = {}
+            abordagensComTotal.forEach(ab => {
+              const nome = ab.equipes?.nome || 'Sem equipe'
+              equipeMap[nome] = (equipeMap[nome] || 0) + ab.total_pessoas
+            })
+            const equipeAbord = Object.entries(equipeMap).sort((a, b) => b[1] - a[1])
+            const maxEquipe = Math.max(...equipeAbord.map(e => e[1]), 1)
+            // mantido para o gráfico de barras inferior
+            const topAbord = [...abordagensComTotal].sort((a, b) => b.total_pessoas - a.total_pessoas).slice(0, 10)
+            const maxAbord = Math.max(...topAbord.map(a => a.total_pessoas), 1)
+
+            // Status por coluna
+            const statusColunas = KANBAN_COLUNAS.map(col => ({
+              ...col,
+              count: dashEvangelizados.filter(e => (e.status_contato || 'pendente') === col.key).length,
+            })).filter(c => c.count > 0)
+            const maxStatus = Math.max(...statusColunas.map(c => c.count), 1)
+
+            // Abordagens por bairro
+            const bairroMap = {}
+            abordagensComTotal.forEach(ab => {
+              const end = ab.local || ab.endereco || ''
+              const partes = end.split(',')
+              const bairro = (partes[1] || partes[0] || '').trim()
+              if (!bairro) return
+              bairroMap[bairro] = (bairroMap[bairro] || 0) + 1
+            })
+            const bairrosAbord = Object.entries(bairroMap).sort((a, b) => b[1] - a[1]).slice(0, 20)
+            const maxBairro = Math.max(...bairrosAbord.map(b => b[1]), 1)
 
             return (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <h2 style={{ ...s.pageTitle, marginBottom: 0 }}>Dashboard</h2>
-                  {filtro && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff4ec', border: '1.5px solid #F97310', borderRadius: '20px', padding: '4px 12px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#F97310' }}>Filtrando: {filtro.titulo} ({filtro.lista.length})</span>
-                      <button onClick={() => setFiltro(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#F97310', fontWeight: 900, fontSize: '14px', padding: '0', lineHeight: 1 }}>✕</button>
-                    </div>
-                  )}
                 </div>
 
                 {/* KPIs */}
-                <div className="dash-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '16px' }}>
+                <div className="dash-kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '16px' }}>
                   {[
-                    { label: 'Total', value: total, color: '#0f1117', bg: '#fff', border: '#e5e7eb', lista: voluntarios },
-                    { label: 'Aprovados', value: aprovados, color: '#F97310', bg: '#fff4ec', border: '#fed7aa', lista: voluntarios.filter(v => v.status === 'aprovado') },
-                    { label: 'Pendentes', value: pendentes, color: '#F97310', bg: '#fff4ec', border: '#fed7aa', lista: voluntarios.filter(v => !v.status || v.status === 'pendente') },
-                    { label: 'Reprovados', value: reprovados, color: '#0f1117', bg: '#f3f4f6', border: '#e5e7eb', lista: voluntarios.filter(v => v.status === 'reprovado') },
+                    { label: 'Evangelizados', value: totalEvang, color: '#0f1117', bg: '#fff', border: '#e5e7eb' },
+                    { label: 'Abordagens', value: totalAbord, color: '#F97310', bg: '#fff4ec', border: '#fed7aa' },
+                    { label: 'Contatados', value: contatados, color: '#F97310', bg: '#fff4ec', border: '#fed7aa' },
                   ].map(k => (
-                    <div key={k.label}
-                      onMouseEnter={e => hover(e, k.label, k.lista)}
-                      onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
-                      onClick={() => clique(k.label, k.lista)}
-                      style={{ background: k.bg, border: `1.5px solid ${k.border}`, borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', ...itemStyle(k.label) }}>
+                    <div key={k.label} style={{ background: k.bg, border: `1.5px solid ${k.border}`, borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                       <div style={{ fontSize: '12px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>{k.label}</div>
                       <div style={{ fontSize: '36px', fontWeight: 900, color: k.color, lineHeight: 1 }}>{k.value}</div>
-                      {k.label !== 'Total' && <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '6px' }}>{pct(k.value, total)}% do total</div>}
+                      {k.label !== 'Evangelizados' && <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '6px' }}>{pct(k.value, totalEvang)}% do total</div>}
                     </div>
                   ))}
                 </div>
 
+                {/* Abordagens por dia */}
+                {(() => {
+                  const diasFixos = [
+                    { label: '28/jun', date: '2026-06-28' },
+                    { label: '29/jun', date: '2026-06-29' },
+                    { label: '30/jun', date: '2026-06-30' },
+                    { label: '01/jul', date: '2026-07-01' },
+                    { label: '02/jul', date: '2026-07-02' },
+                    { label: '03/jul', date: '2026-07-03' },
+                    { label: '04/jul', date: '2026-07-04' },
+                  ].map(d => ({
+                    ...d,
+                    count: abordagensComTotal.filter(ab => ab.data_hora && ab.data_hora.startsWith(d.date)).length,
+                  }))
+                  const maxDia = Math.max(...diasFixos.map(d => d.count), 1)
+                  return (
+                    <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '16px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '20px' }}>Abordagens por dia</div>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '140px' }}>
+                        {diasFixos.map(d => {
+                          const barH = Math.round((d.count / maxDia) * 100)
+                          return (
+                            <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f1117' }}>{d.count || ''}</span>
+                              <div style={{ width: '100%', background: d.count > 0 ? '#F97310' : '#f3f4f6', borderRadius: '6px 6px 0 0', height: `${barH}px`, minHeight: '4px', transition: 'height 0.4s' }} />
+                              <span style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', marginTop: '4px', textAlign: 'center' }}>{d.label}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+
                 {/* Linha 2 */}
-                <div className="dash-mid-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                <div className="dash-mid-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px', marginBottom: '16px' }}>
 
-                  {/* Sexo */}
-                  <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Sexo</div>
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', ...itemStyle('Masculino') }}
-                        onMouseEnter={e => hover(e, 'Masculino', base.filter(v => v.sexo === 'Masculino'))}
-                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
-                        onClick={() => clique('Masculino', voluntarios.filter(v => v.sexo === 'Masculino'))}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#0f1117' }}>{masculino}</div>
-                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Masculino</div>
-                      </div>
-                      <div style={{ width: '1px', background: '#f3f4f6' }} />
-                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', ...itemStyle('Feminino') }}
-                        onMouseEnter={e => hover(e, 'Feminino', base.filter(v => v.sexo === 'Feminino'))}
-                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
-                        onClick={() => clique('Feminino', voluntarios.filter(v => v.sexo === 'Feminino'))}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#F97310' }}>{feminino}</div>
-                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Feminino</div>
-                      </div>
-                    </div>
-                    <div style={{ height: '10px', borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden', display: 'flex' }}>
-                      <div style={{ width: `${pct(masculino, total)}%`, background: '#0f1117', transition: 'width 0.5s' }} />
-                      <div style={{ width: `${pct(feminino, total)}%`, background: '#F97310', transition: 'width 0.5s' }} />
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                      <span style={{ fontSize: '11px', color: '#0f1117', fontWeight: 700 }}>{pct(masculino, total)}%</span>
-                      <span style={{ fontSize: '11px', color: '#F97310', fontWeight: 700 }}>{pct(feminino, total)}%</span>
-                    </div>
-                  </div>
 
-                  {/* Missão anterior */}
-                  <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Missão anterior</div>
-                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', ...itemStyle('Já foram em missão') }}
-                        onMouseEnter={e => hover(e, 'Já foram em missão', base.filter(v => v.ja_participou_missao === true))}
-                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
-                        onClick={() => clique('Já foram em missão', voluntarios.filter(v => v.ja_participou_missao === true))}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#F97310' }}>{missionarios}</div>
-                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Já foram</div>
-                      </div>
-                      <div style={{ width: '1px', background: '#f3f4f6' }} />
-                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', borderRadius: '10px', ...itemStyle('Primeira missão') }}
-                        onMouseEnter={e => hover(e, 'Primeira missão', base.filter(v => !v.ja_participou_missao))}
-                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
-                        onClick={() => clique('Primeira missão', voluntarios.filter(v => !v.ja_participou_missao))}>
-                        <div style={{ fontSize: '28px', fontWeight: 900, color: '#6b7280' }}>{total - missionarios}</div>
-                        <div style={{ fontSize: '12px', color: '#9ca3af', marginTop: '2px' }}>Primeira vez</div>
-                      </div>
-                    </div>
-                    <div style={{ height: '10px', borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden', display: 'flex' }}>
-                      <div style={{ width: `${pct(missionarios, total)}%`, background: '#F97310' }} />
-                    </div>
-                    <div style={{ fontSize: '11px', color: '#F97310', fontWeight: 700, marginTop: '6px' }}>{pct(missionarios, total)}% com experiência</div>
-                  </div>
 
-                  {/* Estado civil + extras */}
-                  <div style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Perfil geral</div>
-                    {[
-                      { label: 'Solteiros', value: solteiros, color: '#F97310', lista: voluntarios.filter(v => v.estado_civil === 'solteiro') },
-                      { label: 'Casados', value: casados, color: '#F97310', lista: voluntarios.filter(v => v.estado_civil === 'casado') },
-                      { label: 'Fora de MG', value: foraMG, color: '#0f1117', lista: voluntarios.filter(v => v.cidade_estado_pais && !v.cidade_estado_pais.includes('Minas Gerais')) },
-                      { label: 'Incompletos', value: incompletos, color: '#0f1117', lista: voluntarios.filter(v => camposFaltando(v).length > 0) },
-                    ].map(item => (
-                      <div key={item.label}
-                        onMouseEnter={e => hover(e, item.label, base.filter(v => item.lista.find(x => x.id === v.id)))}
-                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
-                        onClick={() => clique(item.label, item.lista)}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', cursor: 'pointer', padding: '4px 6px', borderRadius: '8px', ...itemStyle(item.label) }}>
-                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{item.label}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <div style={{ width: '80px', height: '6px', borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden' }}>
-                            <div style={{ width: `${pct(item.value, total)}%`, height: '100%', background: item.color }} />
-                          </div>
-                          <span style={{ fontSize: '13px', fontWeight: 800, color: item.color, minWidth: '24px', textAlign: 'right' }}>{item.value}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+
+
                 </div>
 
                 {/* Linha 3 */}
                 <div className="dash-bot-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
 
-                  {/* Cidades */}
+                  {/* Evangelizados por equipe */}
                   <div style={{ background: '#fff', borderRadius: '16px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     <div style={{ background: 'transparent', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Cidades</div>
-                      {(() => { const barCidade = Math.min(24, Math.max(6, Math.floor(280 / (topCidades.length || 1)))); const itemHCidade = barCidade + 28; const totalHCidade = itemHCidade * topCidades.length + 12 * (topCidades.length - 1); const justifyCidade = totalHCidade <= 320 ? 'center' : 'flex-start'; return (
-                      <div style={{ overflowY: 'auto', height: '320px', paddingRight: '4px', display: 'flex', flexDirection: 'column', justifyContent: justifyCidade, gap: '12px' }}>
-                      {topCidades.map(([cidade, qtd]) => (
-                        <div key={cidade}
-                          onMouseEnter={e => hover(e, cidade, base.filter(v => v.cidade_estado_pais?.split(',')[0].trim() === cidade))}
-                          onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
-                          onClick={() => clique(cidade, voluntarios.filter(v => v.cidade_estado_pais?.split(',')[0].trim() === cidade))}
-                          style={{ cursor: 'pointer', borderRadius: '8px', ...itemStyle(cidade) }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Por equipe</div>
+                      {(() => { const barH = Math.min(24, Math.max(6, Math.floor(280 / (equipeAbord.length || 1)))); const justifyV = (barH + 28) * equipeAbord.length <= 320 ? 'center' : 'flex-start'; return (
+                      <div style={{ overflowY: 'auto', height: '320px', paddingRight: '4px', display: 'flex', flexDirection: 'column', justifyContent: justifyV, gap: '12px' }}>
+                      {equipeAbord.map(([nome, qtd]) => (
+                        <div key={nome} style={{ borderRadius: '8px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{cidade}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>{nome}</span>
                             <span style={{ fontSize: '13px', fontWeight: 800, color: '#F97310' }}>{qtd}</span>
                           </div>
-                          <div style={{ height: `${barCidade}px`, borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden' }}>
-                            <div style={{ width: `${pct(qtd, maxCidade)}%`, height: '100%', background: '#F97310' }} />
+                          <div style={{ height: `${barH}px`, borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden' }}>
+                            <div style={{ width: `${pct(qtd, maxEquipe)}%`, height: '100%', background: '#F97310' }} />
                           </div>
                         </div>
                       ))}
@@ -3028,59 +2962,28 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Competências */}
+                  {/* Abordagens por bairro */}
                   <div style={{ background: '#fff', borderRadius: '16px', padding: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     <div style={{ background: 'transparent', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Competências</div>
-                      {(() => { const compFiltradas = competencias.filter(c => c.count > 0); const barComp = Math.min(24, Math.max(6, Math.floor(280 / (compFiltradas.length || 1)))); const itemHComp = barComp + 28; const totalHComp = itemHComp * compFiltradas.length + 12 * (compFiltradas.length - 1); const justifyComp = totalHComp <= 320 ? 'center' : 'flex-start'; return (
-                      <div style={{ overflowY: 'auto', height: '320px', paddingRight: '4px', display: 'flex', flexDirection: 'column', justifyContent: justifyComp, gap: '12px' }}>
-                      {compFiltradas.map(c => {
-                        const compKey = c.label === 'Mídia/Fotos' ? 'tira_fotos' : c.label === 'Filmagem' ? 'faz_filmagens' : c.label === 'Canto' ? 'canta' : c.label === 'Instrumento' ? 'toca_instrumento' : c.label === 'Inglês' ? 'fala_ingles' : c.label === 'Espanhol' ? 'fala_espanhol' : 'outras_competencias'
-                        return <div key={c.label}
-                          onMouseEnter={e => hover(e, c.label, base.filter(v => v[compKey]))}
-                          onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
-                          onClick={() => clique(c.label, voluntarios.filter(v => v[compKey]))}
-                          style={{ cursor: 'pointer', padding: '4px 6px', borderRadius: '8px', ...itemStyle(c.label) }}>
+                      <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '16px' }}>Abordagens por bairro</div>
+                      {(() => { const barH = Math.min(24, Math.max(6, Math.floor(280 / (bairrosAbord.length || 1)))); const justifyV = (barH + 28) * bairrosAbord.length <= 320 ? 'center' : 'flex-start'; return (
+                      <div style={{ overflowY: 'auto', height: '320px', paddingRight: '4px', display: 'flex', flexDirection: 'column', justifyContent: justifyV, gap: '12px' }}>
+                      {bairrosAbord.map(([bairro, qtd]) => (
+                        <div key={bairro} style={{ borderRadius: '8px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151' }}>{c.label}</span>
-                            <span style={{ fontSize: '13px', fontWeight: 800, color: '#F97310' }}>{c.count}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '70%' }}>{bairro}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 800, color: '#F97310' }}>{qtd}</span>
                           </div>
-                          <div style={{ height: `${barComp}px`, borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden' }}>
-                            <div style={{ width: `${pct(c.count, maxComp)}%`, height: '100%', background: '#F97310' }} />
+                          <div style={{ height: `${barH}px`, borderRadius: '99px', background: '#f3f4f6', overflow: 'hidden' }}>
+                            <div style={{ width: `${pct(qtd, maxBairro)}%`, height: '100%', background: '#F97310' }} />
                           </div>
                         </div>
-                      })}
+                      ))}
                       </div>) })()}
                     </div>
                   </div>
                 </div>
 
-                {/* Faixa etária */}
-                <div className="dash-faixa-etaria" style={{ background: '#fff', borderRadius: '16px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', marginBottom: '32px', overflow: 'visible' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '20px' }}>Faixa etária</div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '160px' }}>
-                    {faixas.map(f => {
-                      const fLista = voluntarios.filter(v => {
-                        if (f.label === '16–20') return v.idade >= 16 && v.idade <= 20
-                        if (f.label === '21–25') return v.idade >= 21 && v.idade <= 25
-                        if (f.label === '26–30') return v.idade >= 26 && v.idade <= 30
-                        if (f.label === '31–40') return v.idade >= 31 && v.idade <= 40
-                        if (f.label === '40+') return v.idade > 40
-                        return false
-                      })
-                      const barH = maxFaixa === 0 ? 0 : Math.round((f.count / maxFaixa) * 100)
-                      return <div key={f.label}
-                        onMouseEnter={e => hover(e, `Faixa ${f.label}`, base.filter(v => fLista.find(x => x.id === v.id)))}
-                        onMouseLeave={() => { clearTimeout(tooltipTimer.current); tooltipTimer.current = setTimeout(() => setTooltip(null), 150) }}
-                        onClick={() => clique(`Faixa ${f.label}`, fLista)}
-                        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', ...itemStyle(`Faixa ${f.label}`) }}>
-                        <span style={{ fontSize: '12px', fontWeight: 800, color: '#0f1117' }}>{f.count}</span>
-                        <div style={{ width: '100%', background: '#F97310', borderRadius: '6px 6px 0 0', height: `${barH}px`, minHeight: f.count > 0 ? '6px' : '0', transition: 'height 0.4s' }} />
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', marginTop: '4px' }}>{f.label}</span>
-                      </div>
-                    })}
-                  </div>
-                </div>
               </>
             )
           })()}
@@ -4947,10 +4850,27 @@ export default function Dashboard() {
                                 </div>
                               )}
                             </div>
-                            <div>
-                              <label style={s.fieldLabel}>Observação</label>
-                              <input style={s.inputEdit} value={pessoa.observacao} onChange={e => setPessoas(p => p.map((x, i) => i === idx ? { ...x, observacao: e.target.value } : x))} />
+                          </div>
+                          <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f9fafb', borderRadius: '10px', border: '1.5px solid #e5e7eb' }}>
+                            <input type="checkbox" id={`convidado-nova-${idx}`} checked={!!pessoa.convidado_culto} onChange={e => setPessoas(p => p.map((x, i) => i === idx ? { ...x, convidado_culto: e.target.checked, resposta_culto: e.target.checked ? x.resposta_culto : '' } : x))} style={{ width: '16px', height: '16px', accentColor: '#F97310', cursor: 'pointer' }} />
+                            <label htmlFor={`convidado-nova-${idx}`} style={{ fontSize: '13px', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Convidado para o culto da Cruzada?</label>
+                          </div>
+                          {pessoa.convidado_culto && (
+                            <div style={{ marginTop: '10px' }}>
+                              <label style={s.fieldLabel}>Vai comparecer?</label>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                {['vai', 'nao_vai', 'nao_sabe'].map(op => (
+                                  <button key={op} type="button" onClick={() => setPessoas(p => p.map((x, i) => i === idx ? { ...x, resposta_culto: op } : x))}
+                                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: `1.5px solid ${pessoa.resposta_culto === op ? '#F97310' : '#e5e7eb'}`, background: pessoa.resposta_culto === op ? '#fff4ec' : '#fff', color: pessoa.resposta_culto === op ? '#F97310' : '#374151', fontWeight: 700, fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                    {op === 'vai' ? 'Vai' : op === 'nao_vai' ? 'Não vai' : 'Não sabe'}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
+                          )}
+                          <div style={{ marginTop: '10px' }}>
+                            <label style={s.fieldLabel}>Observação</label>
+                            <input style={s.inputEdit} value={pessoa.observacao} onChange={e => setPessoas(p => p.map((x, i) => i === idx ? { ...x, observacao: e.target.value } : x))} />
                           </div>
                         </div>
                       ))}
@@ -5108,6 +5028,23 @@ export default function Dashboard() {
                                 </div>
                               )}
                             </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f9fafb', borderRadius: '10px', border: '1.5px solid #e5e7eb' }}>
+                              <input type="checkbox" id={`convidado-edit-${ev.id}`} checked={!!formEditEvangelizado.convidado_culto} onChange={e => setFormEditEvangelizado(f => ({ ...f, convidado_culto: e.target.checked }))} style={{ width: '16px', height: '16px', accentColor: '#F97310', cursor: 'pointer' }} />
+                              <label htmlFor={`convidado-edit-${ev.id}`} style={{ fontSize: '13px', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Convidado para o culto da Cruzada?</label>
+                            </div>
+                            {formEditEvangelizado.convidado_culto && (
+                              <div>
+                                <label style={s.fieldLabel}>Vai comparecer?</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                  {['vai', 'nao_vai', 'nao_sabe'].map(op => (
+                                    <button key={op} onClick={() => setFormEditEvangelizado(f => ({ ...f, resposta_culto: op }))}
+                                      style={{ flex: 1, padding: '8px', borderRadius: '8px', border: `1.5px solid ${formEditEvangelizado.resposta_culto === op ? '#F97310' : '#e5e7eb'}`, background: formEditEvangelizado.resposta_culto === op ? '#fff4ec' : '#fff', color: formEditEvangelizado.resposta_culto === op ? '#F97310' : '#374151', fontWeight: 700, fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                      {op === 'vai' ? 'Vai' : op === 'nao_vai' ? 'Não vai' : 'Não sabe'}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                             <div><label style={s.fieldLabel}>Observação</label><input style={s.inputEdit} value={formEditEvangelizado.observacao || ''} onChange={e => setFormEditEvangelizado(f => ({ ...f, observacao: e.target.value }))} /></div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                               <button style={{ ...s.editBtn, background: '#374151', color: '#fff', border: 'none', textAlign: 'center' }} onClick={() => { setEditandoEvangelizado(null); setModalVincularDependente(ev); setNovoResponsavelId(ev.responsavel_id || '') }}>Vincular</button>
@@ -5127,7 +5064,7 @@ export default function Dashboard() {
                               </div>
                               {(perfilUsuario === 'admin' || abordagemSelecionada.usuario_id === user?.id) && (
                                 <button
-                                  onClick={() => { setEditandoEvangelizado(ev.id); setFormEditEvangelizado({ nome: ev.nome, telefone: ev.telefone, endereco_pessoa: ev.endereco_pessoa, observacao: ev.observacao }); setSugestoesEditEvangelizado([]); setEditEvangelizadoEnderecoConfirmado(true) }}
+                                  onClick={() => { setEditandoEvangelizado(ev.id); setFormEditEvangelizado({ nome: ev.nome, telefone: ev.telefone, endereco_pessoa: ev.endereco_pessoa, observacao: ev.observacao, convidado_culto: ev.convidado_culto || false, resposta_culto: ev.resposta_culto || '' }); setSugestoesEditEvangelizado([]); setEditEvangelizadoEnderecoConfirmado(true) }}
                                   style={{ background: '#fff', border: 'none', borderRadius: '8px', padding: '6px 14px', fontSize: '12px', fontWeight: 700, color: '#0f1117', cursor: 'pointer', fontFamily: 'inherit' }}
                                 >Editar</button>
                               )}
@@ -5189,9 +5126,26 @@ export default function Dashboard() {
                             )}
                           </div>
                           <div><label style={s.fieldLabel}>Observação</label><input style={s.inputEdit} placeholder="Observação" value={formNovaPessoa.observacao} onChange={e => setFormNovaPessoa(f => ({ ...f, observacao: e.target.value }))} /></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f9fafb', borderRadius: '10px', border: '1.5px solid #e5e7eb' }}>
+                            <input type="checkbox" id="convidado-nova" checked={!!formNovaPessoa.convidado_culto} onChange={e => setFormNovaPessoa(f => ({ ...f, convidado_culto: e.target.checked }))} style={{ width: '16px', height: '16px', accentColor: '#F97310', cursor: 'pointer' }} />
+                            <label htmlFor="convidado-nova" style={{ fontSize: '13px', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Convidado para o culto da Cruzada?</label>
+                          </div>
+                          {formNovaPessoa.convidado_culto && (
+                            <div>
+                              <label style={s.fieldLabel}>Vai comparecer?</label>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                {['vai', 'nao_vai', 'nao_sabe'].map(op => (
+                                  <button key={op} onClick={() => setFormNovaPessoa(f => ({ ...f, resposta_culto: op }))}
+                                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: `1.5px solid ${formNovaPessoa.resposta_culto === op ? '#F97310' : '#e5e7eb'}`, background: formNovaPessoa.resposta_culto === op ? '#fff4ec' : '#fff', color: formNovaPessoa.resposta_culto === op ? '#F97310' : '#374151', fontWeight: 700, fontSize: '12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                    {op === 'vai' ? 'Vai' : op === 'nao_vai' ? 'Não vai' : 'Não sabe'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button style={{ ...s.backBtn, background: '#9ca3af', border: 'none', color: '#fff' }} onClick={() => { setAdicionandoPessoa(false); setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '' }); setSugestoesNovaPessoa([]); setNovaPessoaEnderecoConfirmado(false) }}>Cancelar</button>
+                          <button style={{ ...s.backBtn, background: '#9ca3af', border: 'none', color: '#fff' }} onClick={() => { setAdicionandoPessoa(false); setFormNovaPessoa({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '' }); setSugestoesNovaPessoa([]); setNovaPessoaEnderecoConfirmado(false) }}>Cancelar</button>
                           <button style={{ ...s.editBtn, background: '#F97310', color: '#fff' }} onClick={salvarNovaPessoa} disabled={salvandoNovaPessoa}>{salvandoNovaPessoa ? 'Salvando...' : 'Salvar'}</button>
                         </div>
                       </div>
