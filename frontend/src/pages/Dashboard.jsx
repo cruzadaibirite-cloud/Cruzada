@@ -255,6 +255,7 @@ export default function Dashboard() {
   const [editEvangelizadoEnderecoConfirmado, setEditEvangelizadoEnderecoConfirmado] = useState(false)
   const buscaEditEvangelizadoTimer = useRef(null)
   const [adicionandoPessoa, setAdicionandoPessoa] = useState(false)
+  const [filtroSexoEvang, setFiltroSexoEvang] = useState('')
   const [formNovaPessoa, setFormNovaPessoa] = useState({ nome: '', telefone: '', endereco_pessoa: '', observacao: '', convidado_culto: false, resposta_culto: '', sexo: '' })
   const [salvandoNovaPessoa, setSalvandoNovaPessoa] = useState(false)
   const [sugestoesNovaPessoa, setSugestoesNovaPessoa] = useState([])
@@ -4693,13 +4694,21 @@ export default function Dashboard() {
               /* ── Kanban ── */
               <>
               <h2 style={s.pageTitle}>Pessoas</h2>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                {['', 'Masculino', 'Feminino'].map(op => (
+                  <button key={op} type="button" onClick={() => setFiltroSexoEvang(op)}
+                    style={{ padding: '6px 16px', borderRadius: '20px', border: `1.5px solid ${filtroSexoEvang === op ? '#F97310' : '#e5e7eb'}`, background: filtroSexoEvang === op ? '#fff4ec' : '#fff', color: filtroSexoEvang === op ? '#F97310' : '#6b7280', fontWeight: 700, fontSize: '13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {op === '' ? 'Todos' : op}
+                  </button>
+                ))}
+              </div>
               {loadingPessoas && <p style={s.info}>Carregando...</p>}
               {!loadingPessoas && (
                 <>
                   {/* Desktop: colunas horizontais */}
                   <div className="kanban-desktop" style={{ display: 'flex', gap: '10px', paddingBottom: '16px', alignItems: 'flex-start' }}>
                     {KANBAN_COLUNAS.map(col => {
-                      const cartoes = pessoasKanban.filter(p => (p.status_contato || 'pendente') === col.key)
+                      const cartoes = pessoasKanban.filter(p => (p.status_contato || 'pendente') === col.key && (filtroSexoEvang === '' || p.sexo === filtroSexoEvang))
                       return (
                         <div key={col.key}
                           onDragOver={e => { e.preventDefault(); setDragOver(col.key) }}
@@ -4736,7 +4745,7 @@ export default function Dashboard() {
                   {/* Mobile: acordeão */}
                   <div className="kanban-mobile" style={{ display: 'none', flexDirection: 'column', gap: '8px', paddingBottom: '16px' }}>
                     {KANBAN_COLUNAS.map(col => {
-                      const cartoes = pessoasKanban.filter(p => (p.status_contato || 'pendente') === col.key)
+                      const cartoes = pessoasKanban.filter(p => (p.status_contato || 'pendente') === col.key && (filtroSexoEvang === '' || p.sexo === filtroSexoEvang))
                       const aberto = !!acordeaoAberto[col.key]
                       return (
                         <div key={col.key} style={{ borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${aberto ? col.cor : '#e5e7eb'}`, background: '#fff' }}>
