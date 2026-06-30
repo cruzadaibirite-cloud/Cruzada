@@ -1176,7 +1176,7 @@ export default function Dashboard() {
       const p = pessoas[i]
       if (!p.nome.trim()) { setErroAbordagem(`Preencha o nome da pessoa ${i + 1}.`); return }
       if (!p.telefone.trim()) { setErroAbordagem(`Preencha o telefone da pessoa ${i + 1}.`); return }
-      if (!p.endereco_pessoa.trim() || !pessoasConfirmadas[i]) { setErroAbordagem(`Selecione o endereço da pessoa ${i + 1} na lista de sugestões.`); return }
+      if (!p.endereco_pessoa.trim()) { setErroAbordagem(`Preencha o endereço da pessoa ${i + 1}.`); return }
       // observacao é opcional
     }
     setSalvandoAbordagem(true)
@@ -4944,8 +4944,8 @@ export default function Dashboard() {
                                 </button>
                               </div>
                               <input
-                                style={{ ...s.inputEdit, borderColor: pessoasConfirmadas[idx] ? '#e5e7eb' : pessoa.endereco_pessoa ? '#F97310' : '#e5e7eb' }}
-                                placeholder="Digite o endereço e selecione uma opção"
+                                style={s.inputEdit}
+                                placeholder="Digite o endereço"
                                 value={pessoa.endereco_pessoa}
                                 onChange={e => buscarSugestoesPessoa(idx, e.target.value)}
                                 autoComplete="off"
@@ -5120,8 +5120,8 @@ export default function Dashboard() {
                             <div style={{ position: 'relative' }}>
                               <label style={s.fieldLabel}>Endereço (onde mora)</label>
                               <input
-                                style={{ ...s.inputEdit, borderColor: editEvangelizadoEnderecoConfirmado ? '#e5e7eb' : formEditEvangelizado.endereco_pessoa ? '#F97310' : '#e5e7eb' }}
-                                placeholder="Digite e selecione uma opção"
+                                style={s.inputEdit}
+                                placeholder="Digite o endereço"
                                 value={formEditEvangelizado.endereco_pessoa || ''}
                                 onChange={e => {
                                   const txt = e.target.value
@@ -5231,8 +5231,8 @@ export default function Dashboard() {
                           <div style={{ position: 'relative' }}>
                             <label style={s.fieldLabel}>Endereço (onde mora)</label>
                             <input
-                              style={{ ...s.inputEdit, borderColor: novaPessoaEnderecoConfirmado ? '#e5e7eb' : formNovaPessoa.endereco_pessoa ? '#F97310' : '#e5e7eb' }}
-                              placeholder="Digite e selecione uma opção"
+                              style={s.inputEdit}
+                              placeholder="Digite o endereço"
                               value={formNovaPessoa.endereco_pessoa}
                               onChange={e => {
                                 const txt = e.target.value
